@@ -13,12 +13,14 @@ export const frames: Record<FrameType, FrameStyle> = {
     color: '#E91E63',
     icon: 'leaf.fill',
     borderStyle: 'solid',
+    emoji: '🌹',
   },
   classic: {
     name: 'Classic',
     color: '#9C27B0',
     icon: 'square.fill',
     borderStyle: 'solid',
+    emoji: '🦋',
   },
   elegant: {
     name: 'Elegant',

@@ -34,7 +34,14 @@ export default function FrameSelector({ selectedFrame, onSelectFrame }: FrameSel
               ]}
             >
               <View style={[styles.iconContainer, { backgroundColor: frame.color }]}>
-                <IconSymbol name={frame.icon} size={24} color="#FFFFFF" />
+                {frame.emoji ? (
+                  <View style={styles.emojiIconContainer}>
+                    <IconSymbol name={frame.icon} size={20} color="#FFFFFF" style={styles.backgroundIcon} />
+                    <Text style={styles.emoji}>{frame.emoji}</Text>
+                  </View>
+                ) : (
+                  <IconSymbol name={frame.icon} size={24} color="#FFFFFF" />
+                )}
               </View>
               <Text style={[styles.frameName, isSelected && styles.frameNameSelected]}>
                 {frame.name}
@@ -75,6 +82,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
+    position: 'relative',
+  },
+  emojiIconContainer: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  backgroundIcon: {
+    position: 'absolute',
+    opacity: 0.3,
+  },
+  emoji: {
+    fontSize: 24,
+    zIndex: 1,
   },
   frameName: {
     fontSize: 12,

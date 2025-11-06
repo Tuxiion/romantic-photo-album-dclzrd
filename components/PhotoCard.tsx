@@ -13,9 +13,19 @@ interface PhotoCardProps {
   onDelete?: () => void;
   onPlaySong?: () => void;
   isPlaying?: boolean;
+  songDuration?: number;
+  currentPosition?: number;
 }
 
-export default function PhotoCard({ photo, onPress, onDelete, onPlaySong, isPlaying }: PhotoCardProps) {
+export default function PhotoCard({ 
+  photo, 
+  onPress, 
+  onDelete, 
+  onPlaySong, 
+  isPlaying,
+  songDuration,
+  currentPosition 
+}: PhotoCardProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showFullDescription, setShowFullDescription] = useState(false);
 
@@ -50,6 +60,12 @@ export default function PhotoCard({ photo, onPress, onDelete, onPlaySong, isPlay
       month: 'long',
       day: 'numeric',
     });
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   return (
@@ -128,23 +144,38 @@ export default function PhotoCard({ photo, onPress, onDelete, onPlaySong, isPlay
         )}
 
         {photo.songUri && onPlaySong && (
-          <Pressable onPress={onPlaySong} style={styles.songButton}>
-            <IconSymbol
-              name={isPlaying ? 'pause.circle.fill' : 'play.circle.fill'}
-              size={24}
-              color={colors.primary}
-            />
-            <Text style={styles.songButtonText}>
-              {isPlaying ? 'Pause' : 'Play'} {photo.songName || 'Song'}
-            </Text>
-          </Pressable>
+          <View style={styles.songContainer}>
+            <Pressable onPress={onPlaySong} style={styles.songButton}>
+              <View style={styles.playButtonCircle}>
+                <IconSymbol
+                  name={isPlaying ? 'pause.fill' : 'play.fill'}
+                  size={20}
+                  color="#FFFFFF"
+                />
+              </View>
+              <View style={styles.songInfo}>
+                <Text style={styles.songName} numberOfLines={1}>
+                  {photo.songName || 'Song'}
+                </Text>
+                {songDuration && (
+                  <Text style={styles.songDuration}>
+                    {currentPosition ? formatTime(currentPosition) : '0:00'} / {formatTime(songDuration)}
+                  </Text>
+                )}
+              </View>
+            </Pressable>
+            {isPlaying && songDuration && currentPosition !== undefined && (
+              <View style={styles.progressBarContainer}>
+                <View 
+                  style={[
+                    styles.progressBar, 
+                    { width: `${(currentPosition / songDuration) * 100}%` }
+                  ]} 
+                />
+              </View>
+            )}
+          </View>
         )}
-
-        <View style={styles.frameTag}>
-          <Text style={[styles.frameTagText, { color: frame.color }]}>
-            {frame.name} Frame
-          </Text>
-        </View>
       </View>
     </View>
   );
@@ -251,31 +282,53 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: '600',
   },
+  songContainer: {
+    marginTop: 4,
+  },
   songButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
     backgroundColor: colors.highlight,
     borderRadius: 12,
     padding: 12,
-    marginBottom: 12,
     borderWidth: 2,
     borderColor: colors.primary,
   },
-  songButtonText: {
+  playButtonCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    boxShadow: '0px 2px 8px rgba(233, 30, 99, 0.3)',
+    elevation: 3,
+  },
+  songInfo: {
+    flex: 1,
+  },
+  songName: {
     fontSize: 15,
     fontWeight: '600',
     color: colors.text,
+    marginBottom: 2,
   },
-  frameTag: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
+  songDuration: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    fontWeight: '500',
+  },
+  progressBarContainer: {
+    height: 4,
     backgroundColor: colors.highlight,
+    borderRadius: 2,
+    marginTop: 8,
+    overflow: 'hidden',
   },
-  frameTagText: {
-    fontSize: 12,
-    fontWeight: '700',
+  progressBar: {
+    height: '100%',
+    backgroundColor: colors.primary,
+    borderRadius: 2,
   },
 });

@@ -18,4 +18,5 @@ export interface FrameStyle {
   color: string;
   icon: string;
   borderStyle: 'solid' | 'dashed' | 'dotted';
+  emoji?: string; // Optional emoji for enhanced frame styles
 }

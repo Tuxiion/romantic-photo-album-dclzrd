@@ -84,3 +84,15 @@ export async function resumeSound() {
     console.error('Error resuming sound:', error);
   }
 }
+
+export async function getSoundStatus() {
+  try {
+    if (currentSound) {
+      return await currentSound.getStatusAsync();
+    }
+    return null;
+  } catch (error) {
+    console.error('Error getting sound status:', error);
+    return null;
+  }
+}

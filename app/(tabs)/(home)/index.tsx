@@ -14,15 +14,46 @@ import { IconSymbol } from '@/components/IconSymbol';
 import PhotoCard from '@/components/PhotoCard';
 import { usePhotos } from '@/contexts/PhotoContext';
 import * as Haptics from 'expo-haptics';
-import { initializeAudio, playSound, pauseSound, stopSound } from '@/utils/audioPlayer';
+import { initializeAudio, playSound, pauseSound, stopSound, getSoundStatus } from '@/utils/audioPlayer';
 
 export default function HomeScreen() {
   const { photos, deletePhoto } = usePhotos();
   const [playingSongId, setPlayingSongId] = useState<string | null>(null);
+  const [songDuration, setSongDuration] = useState<number>(0);
+  const [currentPosition, setCurrentPosition] = useState<number>(0);
 
   useEffect(() => {
     initializeAudio();
   }, []);
+
+  // Update playback position
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    
+    if (playingSongId) {
+      interval = setInterval(async () => {
+        const status = await getSoundStatus();
+        if (status && status.isLoaded) {
+          setCurrentPosition(status.positionMillis / 1000);
+          if (status.durationMillis) {
+            setSongDuration(status.durationMillis / 1000);
+          }
+          
+          // Auto-stop when finished
+          if (status.didJustFinish) {
+            setPlayingSongId(null);
+            setCurrentPosition(0);
+          }
+        }
+      }, 100);
+    }
+    
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [playingSongId]);
 
   const handleAddPhoto = () => {
     console.log('Navigating to upload screen');
@@ -38,6 +69,8 @@ export default function HomeScreen() {
     if (playingSongId === id) {
       stopSound();
       setPlayingSongId(null);
+      setCurrentPosition(0);
+      setSongDuration(0);
     }
     deletePhoto(id);
   };
@@ -52,6 +85,7 @@ export default function HomeScreen() {
     } else {
       // Stop any currently playing song and play new one
       await stopSound();
+      setCurrentPosition(0);
       await playSound(songUri);
       setPlayingSongId(id);
     }
@@ -119,6 +153,8 @@ export default function HomeScreen() {
                   onDelete={() => handleDeletePhoto(photo.id)}
                   onPlaySong={photo.songUri ? () => handlePlaySong(photo.id, photo.songUri!) : undefined}
                   isPlaying={playingSongId === photo.id}
+                  songDuration={playingSongId === photo.id ? songDuration : undefined}
+                  currentPosition={playingSongId === photo.id ? currentPosition : undefined}
                 />
               ))}
             </View>

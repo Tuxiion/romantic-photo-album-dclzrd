@@ -86,22 +86,28 @@ const TabItem = ({ tab, isActive, onPress }: TabItemProps) => {
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={styles.tabButton}>
       <Animated.View style={[styles.tabContent, animatedStyle]}>
-        {isUploadTab && (
-          <View style={styles.uploadEmojiContainer}>
-            <Text style={styles.uploadEmoji}>💌</Text>
-          </View>
-        )}
         <View
           style={[
             styles.iconContainer,
             isActive && { backgroundColor: colors.highlight },
           ]}
         >
-          <IconSymbol
-            name={tab.icon as any}
-            size={24}
-            color={isActive ? colors.primary : colors.textSecondary}
-          />
+          {isUploadTab ? (
+            <View style={styles.uploadIconWrapper}>
+              <IconSymbol
+                name={tab.icon as any}
+                size={24}
+                color={isActive ? colors.primary : colors.textSecondary}
+              />
+              <Text style={styles.uploadEmoji}>💌</Text>
+            </View>
+          ) : (
+            <IconSymbol
+              name={tab.icon as any}
+              size={24}
+              color={isActive ? colors.primary : colors.textSecondary}
+            />
+          )}
         </View>
         <Text
           style={[
@@ -150,12 +156,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  uploadEmojiContainer: {
-    marginBottom: 2,
-  },
-  uploadEmoji: {
-    fontSize: 20,
-  },
   iconContainer: {
     width: 48,
     height: 48,
@@ -163,6 +163,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 4,
+    position: 'relative',
+  },
+  uploadIconWrapper: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  uploadEmoji: {
+    position: 'absolute',
+    fontSize: 14,
+    top: 2,
+    right: 2,
   },
   label: {
     fontSize: 11,

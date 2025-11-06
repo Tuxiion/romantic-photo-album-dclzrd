@@ -37,6 +37,7 @@ export default function UploadScreen() {
   const [currentCropIndex, setCurrentCropIndex] = useState<number | null>(null);
   const [songUri, setSongUri] = useState<string | null>(null);
   const [songName, setSongName] = useState<string | null>(null);
+  const [isEditingSongName, setIsEditingSongName] = useState(false);
 
   const pickImages = async () => {
     console.log('Requesting image picker permissions...');
@@ -220,7 +221,7 @@ export default function UploadScreen() {
                       onPress={() => removeImage(index)}
                       style={styles.removeButton}
                     >
-                      <IconSymbol name="xmark.circle.fill" size={24} color="#FFFFFF" />
+                      <IconSymbol name="trash.fill" size={20} color="#FFFFFF" />
                     </Pressable>
                     <Pressable
                       onPress={() => openCropModal(index)}
@@ -320,12 +321,30 @@ export default function UploadScreen() {
             <View style={styles.songContainer}>
               <View style={styles.songInfo}>
                 <IconSymbol name="music.note" size={24} color={colors.primary} />
-                <Text style={styles.songName} numberOfLines={1}>
-                  {songName || 'Unknown Song'}
-                </Text>
+                {isEditingSongName ? (
+                  <TextInput
+                    style={styles.songNameInput}
+                    value={songName || ''}
+                    onChangeText={setSongName}
+                    onBlur={() => setIsEditingSongName(false)}
+                    autoFocus
+                    placeholder="Song name"
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                ) : (
+                  <Pressable 
+                    onPress={() => setIsEditingSongName(true)}
+                    style={styles.songNamePressable}
+                  >
+                    <Text style={styles.songName} numberOfLines={1}>
+                      {songName || 'Unknown Song'}
+                    </Text>
+                    <IconSymbol name="pencil" size={16} color={colors.textSecondary} />
+                  </Pressable>
+                )}
               </View>
               <Pressable onPress={removeSong} style={styles.removeSongButton}>
-                <IconSymbol name="xmark.circle.fill" size={24} color={colors.primary} />
+                <IconSymbol name="trash.fill" size={24} color={colors.primary} />
               </Pressable>
             </View>
           ) : (
@@ -429,14 +448,15 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 4,
     right: 4,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: 'rgba(233, 30, 99, 0.9)',
     borderRadius: 12,
+    padding: 6,
   },
   editButton: {
     position: 'absolute',
     top: 4,
     left: 4,
-    backgroundColor: 'rgba(233, 30, 99, 0.8)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     borderRadius: 12,
     padding: 6,
   },
@@ -562,11 +582,26 @@ const styles = StyleSheet.create({
     gap: 12,
     flex: 1,
   },
+  songNamePressable: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
   songName: {
     fontSize: 16,
     color: colors.text,
     fontWeight: '500',
     flex: 1,
+  },
+  songNameInput: {
+    fontSize: 16,
+    color: colors.text,
+    fontWeight: '500',
+    flex: 1,
+    padding: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.primary,
   },
   removeSongButton: {
     padding: 4,
