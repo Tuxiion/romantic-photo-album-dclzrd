@@ -1,42 +1,83 @@
 
-import { View, Text, StyleSheet, ScrollView, Platform, Pressable, Alert } from 'react-native';
 import React, { useState, useEffect } from 'react';
-import { IconSymbol } from '@/components/IconSymbol';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  Platform,
+  Pressable,
+  Alert,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { IconSymbol } from '@/components/IconSymbol';
 import { usePhotos } from '@/contexts/PhotoContext';
 import { colors } from '@/styles/commonStyles';
-import { getAllScheduledNotifications, requestNotificationPermissions } from '@/utils/notifications';
+import {
+  getAllScheduledNotifications,
+  requestNotificationPermissions,
+} from '@/utils/notifications';
 import * as Haptics from 'expo-haptics';
+import * as AuthSession from 'expo-auth-session';
+import * as WebBrowser from 'expo-web-browser';
+
+// Required for web-based authentication
+WebBrowser.maybeCompleteAuthSession();
+
+// Google OAuth configuration
+const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com';
+
+const discovery = {
+  authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
+  tokenEndpoint: 'https://oauth2.googleapis.com/token',
+  revocationEndpoint: 'https://oauth2.googleapis.com/revoke',
+};
 
 export default function ProfileScreen() {
-  const { photos, notificationIds } = usePhotos();
-  const [scheduledNotifications, setScheduledNotifications] = useState(0);
-  const [hasNotificationPermission, setHasNotificationPermission] = useState(false);
+  const { photos } = usePhotos();
+  const [notificationCount, setNotificationCount] = useState(0);
+  const [user, setUser] = useState<{ name?: string; email?: string } | null>(null);
+
+  // Google OAuth setup
+  const [request, response, promptAsync] = AuthSession.useAuthRequest(
+    {
+      clientId: GOOGLE_CLIENT_ID,
+      scopes: ['openid', 'profile', 'email'],
+      redirectUri: AuthSession.makeRedirectUri({
+        scheme: 'natively',
+      }),
+    },
+    discovery
+  );
 
   useEffect(() => {
     checkNotifications();
   }, [photos]);
 
+  useEffect(() => {
+    if (response?.type === 'success') {
+      const { authentication } = response;
+      console.log('Google authentication successful:', authentication);
+      fetchUserInfo(authentication?.accessToken);
+    }
+  }, [response]);
+
   const checkNotifications = async () => {
-    const notifications = await getAllScheduledNotifications();
-    setScheduledNotifications(notifications.length);
-    
-    // Check if we have permission
-    const hasPermission = await requestNotificationPermissions();
-    setHasNotificationPermission(hasPermission);
+    const scheduled = await getAllScheduledNotifications();
+    console.log(`Found ${scheduled.length} scheduled notifications`);
+    setNotificationCount(scheduled.length);
   };
 
   const handleEnableNotifications = async () => {
     const granted = await requestNotificationPermissions();
     if (granted) {
-      setHasNotificationPermission(true);
+      Alert.alert(
+        'Notifications Enabled! 🔔',
+        'You will receive yearly reminders for your romantic memories!'
+      );
       if (Platform.OS !== 'web') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
-      Alert.alert(
-        'Notifications Enabled! 🔔',
-        'You will now receive yearly reminders for your memories!'
-      );
     } else {
       Alert.alert(
         'Permission Denied',
@@ -45,127 +86,168 @@ export default function ProfileScreen() {
     }
   };
 
-  const totalImages = photos.reduce((sum, photo) => sum + photo.uris.length, 0);
+  const fetchUserInfo = async (accessToken?: string) => {
+    if (!accessToken) {
+      console.log('No access token available');
+      return;
+    }
+
+    try {
+      const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const userInfo = await response.json();
+      console.log('User info fetched:', userInfo);
+      setUser({
+        name: userInfo.name,
+        email: userInfo.email,
+      });
+      if (Platform.OS !== 'web') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+      Alert.alert('Welcome!', `Signed in as ${userInfo.name}`);
+    } catch (error) {
+      console.error('Error fetching user info:', error);
+      Alert.alert('Error', 'Failed to fetch user information');
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    console.log('Initiating Google Sign-In...');
+    
+    // Check if Google Client ID is configured
+    if (GOOGLE_CLIENT_ID === 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com') {
+      Alert.alert(
+        'Configuration Required',
+        'Google Sign-In requires configuration:\n\n' +
+        '1. Create a Google Cloud project\n' +
+        '2. Enable Google+ API\n' +
+        '3. Create OAuth 2.0 credentials\n' +
+        '4. Add your Client ID to profile.tsx\n\n' +
+        'For now, this is a demo feature.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+
+    try {
+      const result = await promptAsync();
+      console.log('Auth result:', result);
+    } catch (error) {
+      console.error('Error during Google Sign-In:', error);
+      Alert.alert('Error', 'Failed to sign in with Google');
+    }
+  };
+
+  const handleSignOut = () => {
+    console.log('Signing out...');
+    setUser(null);
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    Alert.alert('Signed Out', 'You have been signed out successfully');
+  };
+
+  const totalPhotos = photos.reduce((sum, photo) => sum + photo.uris.length, 0);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <ScrollView style={styles.container}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
         <View style={styles.header}>
-          <View style={styles.iconContainer}>
-            <IconSymbol name="heart.circle.fill" size={64} color={colors.primary} />
-          </View>
-          <Text style={styles.title}>Your Romantic Album</Text>
-          <Text style={styles.subtitle}>Cherish every moment together 💕</Text>
+          <IconSymbol name="person.fill" size={32} color={colors.primary} />
+          <Text style={styles.title}>Profile</Text>
         </View>
 
-        <View style={styles.statsContainer}>
-          <View style={styles.statCard}>
-            <IconSymbol name="photo.fill.on.rectangle.fill" size={32} color={colors.primary} />
-            <Text style={styles.statNumber}>{photos.length}</Text>
-            <Text style={styles.statLabel}>
-              {photos.length === 1 ? 'Memory' : 'Memories'}
-            </Text>
-          </View>
-
-          <View style={styles.statCard}>
-            <IconSymbol name="photo.fill" size={32} color={colors.secondary} />
-            <Text style={styles.statNumber}>{totalImages}</Text>
-            <Text style={styles.statLabel}>
-              {totalImages === 1 ? 'Photo' : 'Photos'}
-            </Text>
-          </View>
-
-          <View style={styles.statCard}>
-            <IconSymbol name="bell.badge.fill" size={32} color={colors.accent} />
-            <Text style={styles.statNumber}>{scheduledNotifications}</Text>
-            <Text style={styles.statLabel}>
-              {scheduledNotifications === 1 ? 'Reminder' : 'Reminders'}
-            </Text>
-          </View>
-        </View>
-
-        {/* Notification Status */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <IconSymbol name="bell.fill" size={24} color={colors.primary} />
-            <Text style={styles.sectionTitle}>Yearly Reminders</Text>
-          </View>
-          
-          {hasNotificationPermission ? (
-            <View style={styles.notificationCard}>
-              <View style={styles.notificationIconContainer}>
-                <IconSymbol name="checkmark.circle.fill" size={32} color="#34C759" />
-              </View>
-              <View style={styles.notificationTextContainer}>
-                <Text style={styles.notificationTitle}>Notifications Enabled ✓</Text>
-                <Text style={styles.notificationDescription}>
-                  You'll receive reminders every year on your memory dates at 9:00 AM
-                </Text>
-              </View>
+        {/* User Info Card */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <IconSymbol name="person.circle.fill" size={48} color={colors.primary} />
+            <View style={styles.userInfo}>
+              {user ? (
+                <>
+                  <Text style={styles.userName}>{user.name || 'User'}</Text>
+                  <Text style={styles.userEmail}>{user.email || ''}</Text>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.userName}>Guest User</Text>
+                  <Text style={styles.userEmail}>Sign in to sync your memories</Text>
+                </>
+              )}
             </View>
+          </View>
+
+          {user ? (
+            <Pressable onPress={handleSignOut} style={styles.signOutButton}>
+              <IconSymbol name="arrow.right.square.fill" size={20} color={colors.text} />
+              <Text style={styles.signOutButtonText}>Sign Out</Text>
+            </Pressable>
           ) : (
-            <View style={styles.notificationCard}>
-              <View style={styles.notificationIconContainer}>
-                <IconSymbol name="bell.slash.fill" size={32} color={colors.textSecondary} />
-              </View>
-              <View style={styles.notificationTextContainer}>
-                <Text style={styles.notificationTitle}>Enable Reminders</Text>
-                <Text style={styles.notificationDescription}>
-                  Get notified every year to relive your special moments
-                </Text>
-              </View>
-              <Pressable onPress={handleEnableNotifications} style={styles.enableButton}>
-                <Text style={styles.enableButtonText}>Enable</Text>
-              </Pressable>
-            </View>
+            <Pressable onPress={handleGoogleSignIn} style={styles.googleButton}>
+              <IconSymbol name="g.circle.fill" size={20} color="#FFFFFF" />
+              <Text style={styles.googleButtonText}>Sign in with Google</Text>
+            </Pressable>
           )}
         </View>
 
-        {/* Features */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <IconSymbol name="sparkles" size={24} color={colors.primary} />
-            <Text style={styles.sectionTitle}>Features</Text>
-          </View>
-
-          <View style={styles.featureCard}>
-            <IconSymbol name="photo.stack.fill" size={24} color={colors.primary} />
-            <View style={styles.featureTextContainer}>
-              <Text style={styles.featureTitle}>Multiple Photos</Text>
-              <Text style={styles.featureDescription}>
-                Add multiple photos to each memory
-              </Text>
+        {/* Stats Card */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Your Memories</Text>
+          <View style={styles.statsContainer}>
+            <View style={styles.statItem}>
+              <IconSymbol name="heart.fill" size={32} color={colors.primary} />
+              <Text style={styles.statNumber}>{photos.length}</Text>
+              <Text style={styles.statLabel}>Albums</Text>
             </View>
-          </View>
-
-          <View style={styles.featureCard}>
-            <IconSymbol name="calendar.badge.clock" size={24} color={colors.secondary} />
-            <View style={styles.featureTextContainer}>
-              <Text style={styles.featureTitle}>Yearly Reminders</Text>
-              <Text style={styles.featureDescription}>
-                Automatic notifications on anniversary dates
-              </Text>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <IconSymbol name="photo.fill" size={32} color={colors.secondary} />
+              <Text style={styles.statNumber}>{totalPhotos}</Text>
+              <Text style={styles.statLabel}>Photos</Text>
             </View>
-          </View>
-
-          <View style={styles.featureCard}>
-            <IconSymbol name="paintbrush.fill" size={24} color={colors.accent} />
-            <View style={styles.featureTextContainer}>
-              <Text style={styles.featureTitle}>Romantic Frames</Text>
-              <Text style={styles.featureDescription}>
-                Beautiful frames to enhance your photos
-              </Text>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <IconSymbol name="bell.fill" size={32} color={colors.accent} />
+              <Text style={styles.statNumber}>{notificationCount}</Text>
+              <Text style={styles.statLabel}>Reminders</Text>
             </View>
           </View>
         </View>
 
-        {/* Info */}
-        <View style={styles.infoContainer}>
-          <IconSymbol name="info.circle.fill" size={20} color={colors.textSecondary} />
-          <Text style={styles.infoText}>
-            Your memories are stored locally on your device
+        {/* Notifications Card */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <IconSymbol name="bell.badge.fill" size={24} color={colors.primary} />
+            <Text style={styles.cardTitle}>Notifications</Text>
+          </View>
+          <Text style={styles.cardDescription}>
+            Enable notifications to receive yearly reminders for your romantic memories on their
+            anniversary dates.
           </Text>
+          <Pressable onPress={handleEnableNotifications} style={styles.enableButton}>
+            <IconSymbol name="bell.fill" size={20} color="#FFFFFF" />
+            <Text style={styles.enableButtonText}>Enable Notifications</Text>
+          </Pressable>
         </View>
+
+        {/* Info Card */}
+        <View style={styles.infoCard}>
+          <IconSymbol name="info.circle.fill" size={24} color={colors.primary} />
+          <View style={styles.infoContent}>
+            <Text style={styles.infoTitle}>About Romantic Album</Text>
+            <Text style={styles.infoText}>
+              Create beautiful photo albums with romantic frames. Upload multiple photos, choose
+              your favorite frame style, and receive yearly reminders to celebrate your special
+              moments! 💕
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.bottomSpacer} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -179,146 +261,154 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  contentContainer: {
+    padding: 20,
+    paddingBottom: 100,
+  },
   header: {
     alignItems: 'center',
-    paddingVertical: 32,
-    paddingHorizontal: 20,
-  },
-  iconContainer: {
-    marginBottom: 16,
+    marginBottom: 24,
   },
   title: {
     fontSize: 28,
     fontWeight: '800',
     color: colors.text,
-    marginBottom: 8,
+    marginTop: 8,
   },
-  subtitle: {
-    fontSize: 16,
-    color: colors.textSecondary,
-    textAlign: 'center',
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    gap: 12,
-    marginBottom: 24,
-  },
-  statCard: {
-    flex: 1,
+  card: {
     backgroundColor: colors.card,
     borderRadius: 16,
     padding: 20,
+    marginBottom: 16,
+    boxShadow: '0px 4px 12px rgba(233, 30, 99, 0.15)',
+    elevation: 4,
+  },
+  cardHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 2,
+    gap: 12,
+    marginBottom: 16,
+  },
+  userInfo: {
+    flex: 1,
+  },
+  userName: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  userEmail: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  googleButton: {
+    backgroundColor: '#4285F4',
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 12,
+  },
+  googleButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  signOutButton: {
+    backgroundColor: colors.highlight,
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 12,
+    borderWidth: 2,
+    borderColor: colors.textSecondary,
+  },
+  signOutButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  cardDescription: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  statItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  statDivider: {
+    width: 1,
+    height: 60,
+    backgroundColor: colors.highlight,
   },
   statNumber: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '800',
     color: colors.text,
-    marginTop: 12,
+    marginTop: 8,
   },
   statLabel: {
     fontSize: 12,
     color: colors.textSecondary,
     marginTop: 4,
-    fontWeight: '600',
-  },
-  section: {
-    paddingHorizontal: 20,
-    marginBottom: 24,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  notificationCard: {
-    backgroundColor: colors.card,
-    borderRadius: 16,
-    padding: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 2,
-  },
-  notificationIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.highlight,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  notificationTextContainer: {
-    flex: 1,
-  },
-  notificationTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.text,
-    marginBottom: 4,
-  },
-  notificationDescription: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    lineHeight: 18,
   },
   enableButton: {
     backgroundColor: colors.primary,
     borderRadius: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-  },
-  enableButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  featureCard: {
-    backgroundColor: colors.card,
-    borderRadius: 12,
     padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    marginBottom: 12,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.05)',
-    elevation: 1,
-  },
-  featureTextContainer: {
-    flex: 1,
-  },
-  featureTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: 4,
-  },
-  featureDescription: {
-    fontSize: 13,
-    color: colors.textSecondary,
-  },
-  infoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    marginBottom: 100,
+  },
+  enableButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  infoCard: {
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    padding: 20,
+    flexDirection: 'row',
+    gap: 12,
+    borderWidth: 2,
+    borderColor: colors.highlight,
+  },
+  infoContent: {
+    flex: 1,
+  },
+  infoTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 8,
   },
   infoText: {
-    fontSize: 13,
+    fontSize: 14,
     color: colors.textSecondary,
-    textAlign: 'center',
+    lineHeight: 20,
+  },
+  bottomSpacer: {
+    height: 20,
   },
 });

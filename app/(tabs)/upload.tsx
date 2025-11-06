@@ -18,6 +18,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { colors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import FrameSelector from '@/components/FrameSelector';
+import ImageCropModal from '@/components/ImageCropModal';
 import { FrameType } from '@/types/Photo';
 import { usePhotos } from '@/contexts/PhotoContext';
 import { router } from 'expo-router';
@@ -30,6 +31,8 @@ export default function UploadScreen() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedFrame, setSelectedFrame] = useState<FrameType>('hearts');
+  const [cropModalVisible, setCropModalVisible] = useState(false);
+  const [currentCropIndex, setCurrentCropIndex] = useState<number | null>(null);
 
   const pickImages = async () => {
     console.log('Requesting image picker permissions...');
@@ -45,7 +48,7 @@ export default function UploadScreen() {
       allowsEditing: false,
       allowsMultipleSelection: true,
       quality: 0.8,
-      selectionLimit: 10, // Allow up to 10 images
+      selectionLimit: 10,
     });
 
     if (!result.canceled && result.assets.length > 0) {
@@ -64,6 +67,27 @@ export default function UploadScreen() {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
+  };
+
+  const openCropModal = (index: number) => {
+    console.log(`Opening crop modal for image at index ${index}`);
+    setCurrentCropIndex(index);
+    setCropModalVisible(true);
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+  };
+
+  const handleCroppedImage = (croppedUri: string) => {
+    if (currentCropIndex !== null) {
+      console.log(`Updating image at index ${currentCropIndex} with cropped version`);
+      setImageUris(prev => {
+        const newUris = [...prev];
+        newUris[currentCropIndex] = croppedUri;
+        return newUris;
+      });
+    }
+    setCurrentCropIndex(null);
   };
 
   const handleDateChange = (event: any, date?: Date) => {
@@ -156,6 +180,12 @@ export default function UploadScreen() {
                     >
                       <IconSymbol name="xmark.circle.fill" size={24} color="#FFFFFF" />
                     </Pressable>
+                    <Pressable
+                      onPress={() => openCropModal(index)}
+                      style={styles.editButton}
+                    >
+                      <IconSymbol name="crop" size={20} color="#FFFFFF" />
+                    </Pressable>
                     <View style={styles.imageCounter}>
                       <Text style={styles.imageCounterText}>{index + 1}</Text>
                     </View>
@@ -212,7 +242,7 @@ export default function UploadScreen() {
             </Text>
           </Pressable>
           <Text style={styles.reminderText}>
-            📅 You'll receive a yearly reminder on this date!
+            📅 You&apos;ll receive a yearly reminder on this date!
           </Text>
         </View>
 
@@ -227,7 +257,10 @@ export default function UploadScreen() {
         )}
 
         {/* Frame Selector */}
-        <FrameSelector selectedFrame={selectedFrame} onSelectFrame={setSelectedFrame} />
+        <View style={styles.frameSelectorContainer}>
+          <Text style={styles.label}>Choose Frame Style</Text>
+          <FrameSelector selectedFrame={selectedFrame} onSelectFrame={setSelectedFrame} />
+        </View>
 
         {/* Save Button */}
         <Pressable onPress={handleSave} style={styles.saveButton}>
@@ -238,6 +271,19 @@ export default function UploadScreen() {
         {/* Extra spacing at bottom for easier scrolling */}
         <View style={styles.bottomSpacer} />
       </ScrollView>
+
+      {/* Crop Modal */}
+      {currentCropIndex !== null && (
+        <ImageCropModal
+          visible={cropModalVisible}
+          imageUri={imageUris[currentCropIndex]}
+          onClose={() => {
+            setCropModalVisible(false);
+            setCurrentCropIndex(null);
+          }}
+          onSave={handleCroppedImage}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -252,7 +298,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: 20,
-    paddingBottom: 150, // Extra padding at bottom for easier scrolling
+    paddingBottom: 150,
   },
   header: {
     alignItems: 'center',
@@ -301,6 +347,14 @@ const styles = StyleSheet.create({
     right: 4,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
     borderRadius: 12,
+  },
+  editButton: {
+    position: 'absolute',
+    top: 4,
+    left: 4,
+    backgroundColor: 'rgba(233, 30, 99, 0.8)',
+    borderRadius: 12,
+    padding: 6,
   },
   imageCounter: {
     position: 'absolute',
@@ -403,6 +457,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.primary,
     fontWeight: '500',
+  },
+  frameSelectorContainer: {
+    marginBottom: 20,
   },
   saveButton: {
     backgroundColor: colors.primary,

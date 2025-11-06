@@ -17,8 +17,14 @@ export default function TabLayout() {
     {
       name: "upload",
       route: "/(tabs)/upload",
-      icon: "photo.badge.plus.fill", // Changed to a more descriptive upload icon
+      icon: "photo.badge.plus.fill",
       label: "Upload",
+    },
+    {
+      name: "friends",
+      route: "/(tabs)/friends",
+      icon: "person.2.fill",
+      label: "Friends",
     },
     {
       name: "profile",
@@ -40,6 +46,10 @@ export default function TabLayout() {
           <Icon sf="photo.badge.plus.fill" drawable="ic_upload" />
           <Label>Upload</Label>
         </NativeTabs.Trigger>
+        <NativeTabs.Trigger name="friends">
+          <Icon sf="person.2.fill" drawable="ic_friends" />
+          <Label>Friends</Label>
+        </NativeTabs.Trigger>
         <NativeTabs.Trigger name="profile">
           <Icon sf="person.fill" drawable="ic_profile" />
           <Label>Profile</Label>
@@ -59,6 +69,7 @@ export default function TabLayout() {
       >
         <Stack.Screen name="(home)" />
         <Stack.Screen name="upload" />
+        <Stack.Screen name="friends" />
         <Stack.Screen name="profile" />
       </Stack>
 
