@@ -87,12 +87,8 @@ const TabItem = ({ tab, isActive, onPress }: TabItemProps) => {
     <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={styles.tabButton}>
       <Animated.View style={[styles.tabContent, animatedStyle]}>
         {isUploadTab && (
-          <View style={styles.uploadIconContainer}>
-            <IconSymbol
-              name="arrow.up.circle.fill"
-              size={20}
-              color={isActive ? colors.primary : colors.textSecondary}
-            />
+          <View style={styles.uploadEmojiContainer}>
+            <Text style={styles.uploadEmoji}>💌</Text>
           </View>
         )}
         <View
@@ -154,8 +150,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  uploadIconContainer: {
+  uploadEmojiContainer: {
     marginBottom: 2,
+  },
+  uploadEmoji: {
+    fontSize: 20,
   },
   iconContainer: {
     width: 48,

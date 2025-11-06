@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { colors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -28,11 +29,14 @@ export default function UploadScreen() {
   const { addPhoto } = usePhotos();
   const [imageUris, setImageUris] = useState<string[]>([]);
   const [eventName, setEventName] = useState('');
+  const [description, setDescription] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedFrame, setSelectedFrame] = useState<FrameType>('hearts');
   const [cropModalVisible, setCropModalVisible] = useState(false);
   const [currentCropIndex, setCurrentCropIndex] = useState<number | null>(null);
+  const [songUri, setSongUri] = useState<string | null>(null);
+  const [songName, setSongName] = useState<string | null>(null);
 
   const pickImages = async () => {
     console.log('Requesting image picker permissions...');
@@ -58,6 +62,38 @@ export default function UploadScreen() {
       if (Platform.OS !== 'web') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
+    }
+  };
+
+  const pickSong = async () => {
+    try {
+      console.log('Opening document picker for audio...');
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'audio/*',
+        copyToCacheDirectory: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        setSongUri(asset.uri);
+        setSongName(asset.name);
+        console.log('Song selected:', asset.name);
+        if (Platform.OS !== 'web') {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+      }
+    } catch (error) {
+      console.error('Error picking song:', error);
+      Alert.alert('Error', 'Failed to pick song. Please try again.');
+    }
+  };
+
+  const removeSong = () => {
+    console.log('Removing song');
+    setSongUri(null);
+    setSongName(null);
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
   };
 
@@ -113,9 +149,12 @@ export default function UploadScreen() {
       id: Date.now().toString(),
       uris: imageUris,
       eventName: eventName.trim(),
+      description: description.trim() || undefined,
       date: selectedDate,
       frame: selectedFrame,
       createdAt: new Date(),
+      songUri: songUri || undefined,
+      songName: songName || undefined,
     };
 
     console.log(`Saving photo with ${imageUris.length} images:`, newPhoto.eventName);
@@ -128,8 +167,11 @@ export default function UploadScreen() {
     // Reset form
     setImageUris([]);
     setEventName('');
+    setDescription('');
     setSelectedDate(new Date());
     setSelectedFrame('hearts');
+    setSongUri(null);
+    setSongName(null);
 
     Alert.alert(
       'Success!',
@@ -155,7 +197,7 @@ export default function UploadScreen() {
         showsVerticalScrollIndicator={true}
       >
         <View style={styles.header}>
-          <IconSymbol name="heart.fill" size={32} color={colors.primary} />
+          <Text style={styles.iconEmoji}>💌</Text>
           <Text style={styles.title}>Add a Memory</Text>
           <Text style={styles.subtitle}>
             Select multiple photos to create your memory album
@@ -228,6 +270,21 @@ export default function UploadScreen() {
           />
         </View>
 
+        {/* Description Input */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Description (Optional)</Text>
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            placeholder="Add a description to your memory..."
+            placeholderTextColor={colors.textSecondary}
+            value={description}
+            onChangeText={setDescription}
+            multiline
+            numberOfLines={4}
+            textAlignVertical="top"
+          />
+        </View>
+
         {/* Date Picker */}
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Date</Text>
@@ -256,8 +313,32 @@ export default function UploadScreen() {
           />
         )}
 
-        {/* Frame Selector - Label removed from here */}
+        {/* Song Picker */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Song (Optional)</Text>
+          {songUri ? (
+            <View style={styles.songContainer}>
+              <View style={styles.songInfo}>
+                <IconSymbol name="music.note" size={24} color={colors.primary} />
+                <Text style={styles.songName} numberOfLines={1}>
+                  {songName || 'Unknown Song'}
+                </Text>
+              </View>
+              <Pressable onPress={removeSong} style={styles.removeSongButton}>
+                <IconSymbol name="xmark.circle.fill" size={24} color={colors.primary} />
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable onPress={pickSong} style={styles.songPickerButton}>
+              <IconSymbol name="music.note.list" size={20} color={colors.primary} />
+              <Text style={styles.songPickerText}>Add a song to this memory</Text>
+            </Pressable>
+          )}
+        </View>
+
+        {/* Frame Selector with Label */}
         <View style={styles.frameSelectorContainer}>
+          <Text style={styles.label}>Select Frame Style</Text>
           <FrameSelector selectedFrame={selectedFrame} onSelectFrame={setSelectedFrame} />
         </View>
 
@@ -302,6 +383,10 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     marginBottom: 24,
+  },
+  iconEmoji: {
+    fontSize: 48,
+    marginBottom: 8,
   },
   title: {
     fontSize: 28,
@@ -436,6 +521,10 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.highlight,
   },
+  textArea: {
+    minHeight: 100,
+    paddingTop: 16,
+  },
   dateButton: {
     backgroundColor: colors.card,
     borderRadius: 12,
@@ -455,6 +544,46 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 13,
     color: colors.primary,
+    fontWeight: '500',
+  },
+  songContainer: {
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 2,
+    borderColor: colors.highlight,
+  },
+  songInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  songName: {
+    fontSize: 16,
+    color: colors.text,
+    fontWeight: '500',
+    flex: 1,
+  },
+  removeSongButton: {
+    padding: 4,
+  },
+  songPickerButton: {
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 2,
+    borderColor: colors.highlight,
+  },
+  songPickerText: {
+    fontSize: 16,
+    color: colors.textSecondary,
     fontWeight: '500',
   },
   frameSelectorContainer: {

@@ -1,43 +1,51 @@
 
-import { View, Text, StyleSheet, Image, Pressable, Platform, ScrollView } from 'react-native';
 import React, { useState } from 'react';
-import * as Haptics from 'expo-haptics';
-import { colors } from '@/styles/commonStyles';
+import { View, Text, StyleSheet, Image, Pressable, Platform, ScrollView } from 'react-native';
+import { IconSymbol } from './IconSymbol';
 import { Photo } from '@/types/Photo';
 import { frames } from '@/data/frames';
-import { IconSymbol } from './IconSymbol';
+import { colors } from '@/styles/commonStyles';
+import * as Haptics from 'expo-haptics';
 
 interface PhotoCardProps {
   photo: Photo;
   onPress?: () => void;
   onDelete?: () => void;
+  onPlaySong?: () => void;
+  isPlaying?: boolean;
 }
 
-export default function PhotoCard({ photo, onPress, onDelete }: PhotoCardProps) {
+export default function PhotoCard({ photo, onPress, onDelete, onPlaySong, isPlaying }: PhotoCardProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const frameStyle = frames[photo.frame];
+  const [showFullDescription, setShowFullDescription] = useState(false);
+
+  const frame = frames[photo.frame];
 
   const handleDelete = () => {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
-    onDelete?.();
+    if (onDelete) {
+      onDelete();
+    }
   };
 
   const handleImagePress = () => {
     if (photo.uris.length > 1) {
-      // Cycle through images
-      setCurrentImageIndex((prev) => (prev + 1) % photo.uris.length);
+      const nextIndex = (currentImageIndex + 1) % photo.uris.length;
+      setCurrentImageIndex(nextIndex);
+      console.log(`Showing image ${nextIndex + 1} of ${photo.uris.length}`);
       if (Platform.OS !== 'web') {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
     }
-    onPress?.();
+    if (onPress) {
+      onPress();
+    }
   };
 
   const formatDate = (date: Date) => {
-    const dateObj = date instanceof Date ? date : new Date(date);
-    return dateObj.toLocaleDateString('en-US', {
+    return new Date(date).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -45,193 +53,229 @@ export default function PhotoCard({ photo, onPress, onDelete }: PhotoCardProps) 
   };
 
   return (
-    <View style={styles.container}>
+    <View style={styles.card}>
+      {/* Image Container */}
       <Pressable onPress={handleImagePress} style={styles.imageContainer}>
         <Image
           source={{ uri: photo.uris[currentImageIndex] }}
-          style={styles.image}
-          resizeMode="cover"
-        />
-        <View
           style={[
-            styles.frame,
+            styles.image,
             {
-              borderColor: frameStyle.color,
-              borderStyle: frameStyle.borderStyle,
+              borderColor: frame.color,
+              borderWidth: 4,
+              borderStyle: frame.borderStyle,
             },
           ]}
+          resizeMode="cover"
         />
-        
-        {/* Image counter for multiple images */}
         {photo.uris.length > 1 && (
-          <View style={styles.imageCounterBadge}>
-            <IconSymbol name="photo.fill.on.rectangle.fill" size={14} color="#FFFFFF" />
-            <Text style={styles.imageCounterText}>
+          <View style={styles.imageIndicator}>
+            <IconSymbol name="photo.stack.fill" size={16} color="#FFFFFF" />
+            <Text style={styles.imageIndicatorText}>
               {currentImageIndex + 1}/{photo.uris.length}
             </Text>
           </View>
         )}
-
-        {/* Tap indicator for multiple images */}
         {photo.uris.length > 1 && (
-          <View style={styles.tapIndicator}>
-            <IconSymbol name="hand.tap.fill" size={16} color="#FFFFFF" />
-            <Text style={styles.tapIndicatorText}>Tap to see more</Text>
+          <View style={styles.swipeHint}>
+            <Text style={styles.swipeHintText}>Tap to see more</Text>
           </View>
         )}
       </Pressable>
 
-      <View style={styles.infoContainer}>
-        <View style={styles.headerRow}>
-          <View style={styles.iconContainer}>
-            <IconSymbol name={frameStyle.icon} size={20} color={frameStyle.color} />
-          </View>
-          <View style={styles.textContainer}>
-            <Text style={styles.eventName} numberOfLines={1}>
-              {photo.eventName}
-            </Text>
-            <Text style={styles.date}>{formatDate(photo.date)}</Text>
+      {/* Content */}
+      <View style={styles.content}>
+        <View style={styles.header}>
+          <View style={styles.titleContainer}>
+            <IconSymbol name={frame.icon} size={20} color={frame.color} />
+            <Text style={styles.eventName}>{photo.eventName}</Text>
           </View>
           {onDelete && (
             <Pressable onPress={handleDelete} style={styles.deleteButton}>
-              <IconSymbol name="trash.fill" size={20} color={colors.error || '#FF3B30'} />
+              <IconSymbol name="trash.fill" size={20} color={colors.primary} />
             </Pressable>
           )}
         </View>
 
-        {/* Image dots indicator */}
-        {photo.uris.length > 1 && (
-          <View style={styles.dotsContainer}>
-            {photo.uris.map((_, index) => (
-              <View
-                key={index}
-                style={[
-                  styles.dot,
-                  index === currentImageIndex && styles.dotActive,
-                ]}
-              />
-            ))}
+        <View style={styles.dateContainer}>
+          <IconSymbol name="calendar" size={16} color={colors.textSecondary} />
+          <Text style={styles.date}>{formatDate(photo.date)}</Text>
+        </View>
+
+        {photo.description && (
+          <View style={styles.descriptionContainer}>
+            <Text
+              style={styles.description}
+              numberOfLines={showFullDescription ? undefined : 3}
+            >
+              {photo.description}
+            </Text>
+            {photo.description.length > 100 && (
+              <Pressable
+                onPress={() => {
+                  setShowFullDescription(!showFullDescription);
+                  if (Platform.OS !== 'web') {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  }
+                }}
+              >
+                <Text style={styles.readMoreText}>
+                  {showFullDescription ? 'Show less' : 'Read more'}
+                </Text>
+              </Pressable>
+            )}
           </View>
         )}
+
+        {photo.songUri && onPlaySong && (
+          <Pressable onPress={onPlaySong} style={styles.songButton}>
+            <IconSymbol
+              name={isPlaying ? 'pause.circle.fill' : 'play.circle.fill'}
+              size={24}
+              color={colors.primary}
+            />
+            <Text style={styles.songButtonText}>
+              {isPlaying ? 'Pause' : 'Play'} {photo.songName || 'Song'}
+            </Text>
+          </Pressable>
+        )}
+
+        <View style={styles.frameTag}>
+          <Text style={[styles.frameTagText, { color: frame.color }]}>
+            {frame.name} Frame
+          </Text>
+        </View>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  card: {
     backgroundColor: colors.card,
     borderRadius: 16,
     overflow: 'hidden',
-    marginBottom: 20,
     boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.1)',
     elevation: 4,
   },
   imageContainer: {
+    position: 'relative',
     width: '100%',
     aspectRatio: 4 / 3,
-    position: 'relative',
   },
   image: {
     width: '100%',
     height: '100%',
   },
-  frame: {
+  imageIndicator: {
     position: 'absolute',
-    top: 8,
-    left: 8,
-    right: 8,
-    bottom: 8,
-    borderWidth: 4,
-    borderRadius: 8,
-    pointerEvents: 'none',
-  },
-  imageCounterBadge: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
+    top: 12,
+    right: 12,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    borderRadius: 16,
-    paddingHorizontal: 10,
+    borderRadius: 20,
+    paddingHorizontal: 12,
     paddingVertical: 6,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
   },
-  imageCounterText: {
+  imageIndicatorText: {
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '700',
   },
-  tapIndicator: {
+  swipeHint: {
     position: 'absolute',
-    bottom: 16,
-    right: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    borderRadius: 16,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    flexDirection: 'row',
+    bottom: 12,
+    left: 0,
+    right: 0,
     alignItems: 'center',
-    gap: 4,
   },
-  tapIndicatorText: {
+  swipeHintText: {
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     color: '#FFFFFF',
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
   },
-  infoContainer: {
+  content: {
     padding: 16,
   },
-  headerRow: {
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  titleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.highlight,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  textContainer: {
+    gap: 8,
     flex: 1,
   },
   eventName: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
     color: colors.text,
-    marginBottom: 4,
+    flex: 1,
+  },
+  deleteButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: colors.highlight,
+  },
+  dateContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 12,
   },
   date: {
     fontSize: 14,
     color: colors.textSecondary,
     fontWeight: '500',
   },
-  deleteButton: {
-    padding: 8,
+  descriptionContainer: {
+    marginBottom: 12,
   },
-  dotsContainer: {
+  description: {
+    fontSize: 15,
+    color: colors.text,
+    lineHeight: 22,
+    marginBottom: 4,
+  },
+  readMoreText: {
+    fontSize: 14,
+    color: colors.primary,
+    fontWeight: '600',
+  },
+  songButton: {
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 12,
-    gap: 6,
+    gap: 8,
+    backgroundColor: colors.highlight,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: colors.primary,
   },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: colors.textSecondary,
-    opacity: 0.3,
+  songButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.text,
   },
-  dotActive: {
-    backgroundColor: colors.primary,
-    opacity: 1,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  frameTag: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: colors.highlight,
+  },
+  frameTagText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
 });

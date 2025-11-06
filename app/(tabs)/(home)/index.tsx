@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,9 +14,15 @@ import { IconSymbol } from '@/components/IconSymbol';
 import PhotoCard from '@/components/PhotoCard';
 import { usePhotos } from '@/contexts/PhotoContext';
 import * as Haptics from 'expo-haptics';
+import { initializeAudio, playSound, pauseSound, stopSound } from '@/utils/audioPlayer';
 
 export default function HomeScreen() {
   const { photos, deletePhoto } = usePhotos();
+  const [playingSongId, setPlayingSongId] = useState<string | null>(null);
+
+  useEffect(() => {
+    initializeAudio();
+  }, []);
 
   const handleAddPhoto = () => {
     console.log('Navigating to upload screen');
@@ -28,7 +34,31 @@ export default function HomeScreen() {
 
   const handleDeletePhoto = (id: string) => {
     console.log('Deleting photo:', id);
+    // Stop playing if this photo's song is playing
+    if (playingSongId === id) {
+      stopSound();
+      setPlayingSongId(null);
+    }
     deletePhoto(id);
+  };
+
+  const handlePlaySong = async (id: string, songUri: string) => {
+    console.log('Playing song for photo:', id);
+    
+    if (playingSongId === id) {
+      // Pause current song
+      await pauseSound();
+      setPlayingSongId(null);
+    } else {
+      // Stop any currently playing song and play new one
+      await stopSound();
+      await playSound(songUri);
+      setPlayingSongId(id);
+    }
+    
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
   };
 
   const renderHeaderRight = () => (
@@ -58,7 +88,7 @@ export default function HomeScreen() {
           {/* Header */}
           <View style={styles.header}>
             <IconSymbol name="heart.fill" size={40} color={colors.primary} />
-            <Text style={styles.title}>My story</Text>
+            <Text style={styles.title}>My Stories</Text>
             <Text style={styles.subtitle}>
               {photos.length} {photos.length === 1 ? 'Memory' : 'Memories'} Captured
             </Text>
@@ -87,6 +117,8 @@ export default function HomeScreen() {
                   key={photo.id}
                   photo={photo}
                   onDelete={() => handleDeletePhoto(photo.id)}
+                  onPlaySong={photo.songUri ? () => handlePlaySong(photo.id, photo.songUri!) : undefined}
+                  isPlaying={playingSongId === photo.id}
                 />
               ))}
             </View>
