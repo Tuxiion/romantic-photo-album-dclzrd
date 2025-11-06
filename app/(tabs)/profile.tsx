@@ -31,15 +31,18 @@ export default function ProfileScreen() {
   const [user, setUser] = useState<{ name?: string; email?: string } | null>(null);
   const [friendsCount, setFriendsCount] = useState(0);
 
+  // Generate the redirect URI
+  const redirectUri = AuthSession.makeRedirectUri({
+    scheme: 'romantic',
+    path: 'redirect',
+  });
+
   // Google OAuth setup with proper configuration
   const [request, response, promptAsync] = AuthSession.useAuthRequest(
     {
       clientId: GOOGLE_CLIENT_ID,
       scopes: ['openid', 'profile', 'email'],
-      redirectUri: AuthSession.makeRedirectUri({
-        scheme: 'natively',
-        path: 'redirect',
-      }),
+      redirectUri: redirectUri,
     },
     {
       authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
@@ -47,6 +50,21 @@ export default function ProfileScreen() {
       revocationEndpoint: 'https://oauth2.googleapis.com/revoke',
     }
   );
+
+  useEffect(() => {
+    // Log the redirect URI for Google Cloud Console setup
+    console.log('='.repeat(60));
+    console.log('GOOGLE OAUTH REDIRECT URI:');
+    console.log(redirectUri);
+    console.log('='.repeat(60));
+    console.log('Add this URI to your Google Cloud Console:');
+    console.log('1. Go to: https://console.cloud.google.com/');
+    console.log('2. Select your project');
+    console.log('3. Go to: APIs & Services > Credentials');
+    console.log('4. Click on your OAuth 2.0 Client ID');
+    console.log('5. Add the above URI to "Authorized redirect URIs"');
+    console.log('='.repeat(60));
+  }, [redirectUri]);
 
   useEffect(() => {
     if (response?.type === 'success') {
@@ -135,6 +153,24 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleShowRedirectUri = () => {
+    Alert.alert(
+      'Google OAuth Setup',
+      `Add this Redirect URI to your Google Cloud Console:\n\n${redirectUri}\n\nSteps:\n1. Go to console.cloud.google.com\n2. Select your project\n3. Go to APIs & Services > Credentials\n4. Click your OAuth 2.0 Client ID\n5. Add the URI to "Authorized redirect URIs"\n6. Save changes`,
+      [
+        {
+          text: 'Copy URI',
+          onPress: () => {
+            // On web, we can't copy to clipboard easily, so just show it
+            console.log('Redirect URI:', redirectUri);
+            Alert.alert('URI Logged', 'Check the console for the redirect URI');
+          },
+        },
+        { text: 'OK' },
+      ]
+    );
+  };
+
   const totalPhotos = photos.reduce((sum, photo) => sum + photo.uris.length, 0);
 
   return (
@@ -170,14 +206,24 @@ export default function ProfileScreen() {
               <Text style={styles.signOutButtonText}>Sign Out</Text>
             </Pressable>
           ) : (
-            <Pressable 
-              onPress={handleGoogleSignIn} 
-              style={styles.googleButton}
-              disabled={!request}
-            >
-              <IconSymbol name="g.circle.fill" size={20} color="#FFFFFF" />
-              <Text style={styles.googleButtonText}>Sign in with Google</Text>
-            </Pressable>
+            <>
+              <Pressable 
+                onPress={handleGoogleSignIn} 
+                style={styles.googleButton}
+                disabled={!request}
+              >
+                <IconSymbol name="g.circle.fill" size={20} color="#FFFFFF" />
+                <Text style={styles.googleButtonText}>Sign in with Google</Text>
+              </Pressable>
+              
+              <Pressable 
+                onPress={handleShowRedirectUri} 
+                style={styles.infoButton}
+              >
+                <IconSymbol name="info.circle.fill" size={16} color={colors.primary} />
+                <Text style={styles.infoButtonText}>View Google OAuth Setup Instructions</Text>
+              </Pressable>
+            </>
           )}
         </View>
 
@@ -202,6 +248,29 @@ export default function ProfileScreen() {
               <Text style={styles.statNumber}>{friendsCount}</Text>
               <Text style={styles.statLabel}>Friends</Text>
             </View>
+          </View>
+        </View>
+
+        {/* Google OAuth Info Card */}
+        <View style={styles.infoCard}>
+          <IconSymbol name="info.circle.fill" size={24} color={colors.primary} />
+          <View style={styles.infoContent}>
+            <Text style={styles.infoTitle}>Google Sign-In Setup</Text>
+            <Text style={styles.infoText}>
+              To enable Google Sign-In, add this redirect URI to your Google Cloud Console:
+            </Text>
+            <View style={styles.uriBox}>
+              <Text style={styles.uriText} selectable>{redirectUri}</Text>
+            </View>
+            <Text style={styles.infoText}>
+              Steps:{'\n'}
+              1. Go to console.cloud.google.com{'\n'}
+              2. Select your project{'\n'}
+              3. Navigate to APIs & Services → Credentials{'\n'}
+              4. Click your OAuth 2.0 Client ID{'\n'}
+              5. Add the URI above to &quot;Authorized redirect URIs&quot;{'\n'}
+              6. Save changes
+            </Text>
           </View>
         </View>
 
@@ -253,7 +322,7 @@ export default function ProfileScreen() {
         <View style={styles.infoCard}>
           <IconSymbol name="info.circle.fill" size={24} color={colors.primary} />
           <View style={styles.infoContent}>
-            <Text style={styles.infoTitle}>About Romantic Album</Text>
+            <Text style={styles.infoTitle}>About Romantic</Text>
             <Text style={styles.infoText}>
               Create beautiful photo albums with romantic frames. Upload multiple photos, choose
               your favorite frame style, and receive yearly reminders to celebrate your special
@@ -331,6 +400,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  infoButton: {
+    backgroundColor: colors.highlight,
+    borderRadius: 12,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  infoButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.primary,
   },
   signOutButton: {
     backgroundColor: colors.highlight,
@@ -420,6 +506,7 @@ const styles = StyleSheet.create({
     gap: 12,
     borderWidth: 2,
     borderColor: colors.highlight,
+    marginBottom: 16,
   },
   infoContent: {
     flex: 1,
@@ -434,6 +521,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textSecondary,
     lineHeight: 20,
+  },
+  uriBox: {
+    backgroundColor: colors.highlight,
+    borderRadius: 8,
+    padding: 12,
+    marginVertical: 8,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  uriText: {
+    fontSize: 12,
+    color: colors.text,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
   bottomSpacer: {
     height: 20,

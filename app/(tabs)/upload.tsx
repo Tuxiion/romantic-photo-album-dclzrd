@@ -20,6 +20,7 @@ import { colors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import FrameSelector from '@/components/FrameSelector';
 import ImageCropModal from '@/components/ImageCropModal';
+import ImageAdjustModal, { ImageAdjustments } from '@/components/ImageAdjustModal';
 import { FrameType } from '@/types/Photo';
 import { usePhotos } from '@/contexts/PhotoContext';
 import { router } from 'expo-router';
@@ -28,13 +29,16 @@ import * as Haptics from 'expo-haptics';
 export default function UploadScreen() {
   const { addPhoto } = usePhotos();
   const [imageUris, setImageUris] = useState<string[]>([]);
+  const [imageAdjustments, setImageAdjustments] = useState<ImageAdjustments[]>([]);
   const [eventName, setEventName] = useState('');
   const [description, setDescription] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedFrame, setSelectedFrame] = useState<FrameType>('hearts');
   const [cropModalVisible, setCropModalVisible] = useState(false);
+  const [adjustModalVisible, setAdjustModalVisible] = useState(false);
   const [currentCropIndex, setCurrentCropIndex] = useState<number | null>(null);
+  const [currentAdjustIndex, setCurrentAdjustIndex] = useState<number | null>(null);
   const [songUri, setSongUri] = useState<string | null>(null);
   const [songName, setSongName] = useState<string | null>(null);
   const [isEditingSongName, setIsEditingSongName] = useState(false);
@@ -60,6 +64,14 @@ export default function UploadScreen() {
       const newUris = result.assets.map(asset => asset.uri);
       console.log(`Selected ${newUris.length} images`);
       setImageUris(prev => [...prev, ...newUris]);
+      // Initialize adjustments for new images
+      const newAdjustments = newUris.map(() => ({
+        scale: 1,
+        translateX: 0,
+        translateY: 0,
+      }));
+      setImageAdjustments(prev => [...prev, ...newAdjustments]);
+      
       if (Platform.OS !== 'web') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
@@ -101,6 +113,7 @@ export default function UploadScreen() {
   const removeImage = (index: number) => {
     console.log(`Removing image at index ${index}`);
     setImageUris(prev => prev.filter((_, i) => i !== index));
+    setImageAdjustments(prev => prev.filter((_, i) => i !== index));
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
@@ -110,6 +123,15 @@ export default function UploadScreen() {
     console.log(`Opening crop modal for image at index ${index}`);
     setCurrentCropIndex(index);
     setCropModalVisible(true);
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+  };
+
+  const openAdjustModal = (index: number) => {
+    console.log(`Opening adjust modal for image at index ${index}`);
+    setCurrentAdjustIndex(index);
+    setAdjustModalVisible(true);
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
@@ -125,6 +147,19 @@ export default function UploadScreen() {
       });
     }
     setCurrentCropIndex(null);
+  };
+
+  const handleAdjustedImage = (adjustments: ImageAdjustments) => {
+    if (currentAdjustIndex !== null) {
+      console.log(`Saving adjustments for image at index ${currentAdjustIndex}`);
+      setImageAdjustments(prev => {
+        const newAdjustments = [...prev];
+        newAdjustments[currentAdjustIndex] = adjustments;
+        return newAdjustments;
+      });
+      setAdjustModalVisible(false);
+      setCurrentAdjustIndex(null);
+    }
   };
 
   const handleDateChange = (event: any, date?: Date) => {
@@ -156,6 +191,7 @@ export default function UploadScreen() {
       createdAt: new Date(),
       songUri: songUri || undefined,
       songName: songName || undefined,
+      imageAdjustments: imageAdjustments,
     };
 
     console.log(`Saving photo with ${imageUris.length} images:`, newPhoto.eventName);
@@ -167,6 +203,7 @@ export default function UploadScreen() {
 
     // Reset form
     setImageUris([]);
+    setImageAdjustments([]);
     setEventName('');
     setDescription('');
     setSelectedDate(new Date());
@@ -229,6 +266,12 @@ export default function UploadScreen() {
                     >
                       <IconSymbol name="crop" size={20} color="#FFFFFF" />
                     </Pressable>
+                    <Pressable
+                      onPress={() => openAdjustModal(index)}
+                      style={styles.adjustButton}
+                    >
+                      <IconSymbol name="viewfinder" size={20} color="#FFFFFF" />
+                    </Pressable>
                     <View style={styles.imageCounter}>
                       <Text style={styles.imageCounterText}>{index + 1}</Text>
                     </View>
@@ -271,22 +314,7 @@ export default function UploadScreen() {
           />
         </View>
 
-        {/* Description Input */}
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Description (Optional)</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            placeholder="Add a description to your memory..."
-            placeholderTextColor={colors.textSecondary}
-            value={description}
-            onChangeText={setDescription}
-            multiline
-            numberOfLines={4}
-            textAlignVertical="top"
-          />
-        </View>
-
-        {/* Date Picker */}
+        {/* Date Picker - NOW BEFORE DESCRIPTION */}
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Date</Text>
           <Pressable onPress={() => setShowDatePicker(true)} style={styles.dateButton}>
@@ -313,6 +341,21 @@ export default function UploadScreen() {
             maximumDate={new Date()}
           />
         )}
+
+        {/* Description Input - NOW AFTER DATE */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Description (Optional)</Text>
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            placeholder="Add a description to your memory..."
+            placeholderTextColor={colors.textSecondary}
+            value={description}
+            onChangeText={setDescription}
+            multiline
+            numberOfLines={4}
+            textAlignVertical="top"
+          />
+        </View>
 
         {/* Song Picker */}
         <View style={styles.inputContainer}>
@@ -381,6 +424,19 @@ export default function UploadScreen() {
             setCurrentCropIndex(null);
           }}
           onSave={handleCroppedImage}
+        />
+      )}
+
+      {/* Adjust Modal */}
+      {currentAdjustIndex !== null && (
+        <ImageAdjustModal
+          visible={adjustModalVisible}
+          imageUri={imageUris[currentAdjustIndex]}
+          onClose={() => {
+            setAdjustModalVisible(false);
+            setCurrentAdjustIndex(null);
+          }}
+          onSave={handleAdjustedImage}
         />
       )}
     </SafeAreaView>
@@ -457,6 +513,14 @@ const styles = StyleSheet.create({
     top: 4,
     left: 4,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 12,
+    padding: 6,
+  },
+  adjustButton: {
+    position: 'absolute',
+    top: 40,
+    left: 4,
+    backgroundColor: 'rgba(76, 175, 80, 0.9)',
     borderRadius: 12,
     padding: 6,
   },

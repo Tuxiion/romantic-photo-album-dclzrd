@@ -1,11 +1,20 @@
 
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Image, Pressable, Platform, ScrollView } from 'react-native';
-import { IconSymbol } from './IconSymbol';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Image,
+  Pressable,
+  Platform,
+  ScrollView,
+} from 'react-native';
 import { Photo } from '@/types/Photo';
-import { frames } from '@/data/frames';
+import { IconSymbol } from './IconSymbol';
 import { colors } from '@/styles/commonStyles';
+import { frames } from '@/data/frames';
 import * as Haptics from 'expo-haptics';
+import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 
 interface PhotoCardProps {
   photo: Photo;
@@ -18,68 +27,58 @@ interface PhotoCardProps {
   currentPosition?: number;
 }
 
-export default function PhotoCard({ 
-  photo, 
-  onPress, 
-  onDelete, 
-  onPlaySong, 
+export default function PhotoCard({
+  photo,
+  onPress,
+  onDelete,
+  onPlaySong,
   onSeekSong,
   isPlaying,
   songDuration,
-  currentPosition 
+  currentPosition,
 }: PhotoCardProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [showFullDescription, setShowFullDescription] = useState(false);
-  const [progressBarWidth, setProgressBarWidth] = useState(0);
-
-  const frame = frames[photo.frame];
+  const frameStyle = frames[photo.frame];
 
   const handleDelete = () => {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
-    if (onDelete) {
-      onDelete();
-    }
+    onDelete?.();
   };
 
   const handleImagePress = () => {
     if (photo.uris.length > 1) {
       const nextIndex = (currentImageIndex + 1) % photo.uris.length;
       setCurrentImageIndex(nextIndex);
-      console.log(`Showing image ${nextIndex + 1} of ${photo.uris.length}`);
       if (Platform.OS !== 'web') {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
     }
-    if (onPress) {
-      onPress();
-    }
   };
 
   const handleProgressBarPress = (event: any) => {
-    if (!songDuration || !onSeekSong || !progressBarWidth) {
-      console.log('Cannot seek: missing duration, seek handler, or bar width');
+    if (!songDuration || !onSeekSong) {
+      console.log('Cannot seek: missing duration or callback');
       return;
     }
 
     const { locationX } = event.nativeEvent;
-    
-    // Calculate the position based on where user tapped
-    const percentage = Math.max(0, Math.min(1, locationX / progressBarWidth));
+    const progressBarWidth = event.currentTarget.offsetWidth || 300;
+    const percentage = locationX / progressBarWidth;
     const newPosition = percentage * songDuration;
-    
+
     console.log(`Seeking to ${newPosition.toFixed(2)}s (${(percentage * 100).toFixed(1)}%)`);
-    
+    onSeekSong(newPosition);
+
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-    
-    onSeekSong(newPosition);
   };
 
   const formatDate = (date: Date) => {
-    return new Date(date).toLocaleDateString('en-US', {
+    const d = new Date(date);
+    return d.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -92,124 +91,107 @@ export default function PhotoCard({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const currentAdjustment = photo.imageAdjustments?.[currentImageIndex];
+
   return (
     <View style={styles.card}>
-      {/* Image Container */}
       <Pressable onPress={handleImagePress} style={styles.imageContainer}>
-        <Image
-          source={{ uri: photo.uris[currentImageIndex] }}
+        <View
           style={[
-            styles.image,
+            styles.frameContainer,
             {
-              borderColor: frame.color,
+              borderColor: frameStyle.color,
               borderWidth: 4,
-              borderStyle: frame.borderStyle,
+              borderStyle: frameStyle.borderStyle,
             },
           ]}
-          resizeMode="cover"
-        />
+        >
+          <View style={styles.imageWrapper}>
+            <Image
+              source={{ uri: photo.uris[currentImageIndex] }}
+              style={[
+                styles.image,
+                currentAdjustment && {
+                  transform: [
+                    { scale: currentAdjustment.scale },
+                    { translateX: currentAdjustment.translateX },
+                    { translateY: currentAdjustment.translateY },
+                  ],
+                },
+              ]}
+              resizeMode="cover"
+            />
+          </View>
+          {frameStyle.emoji && (
+            <View style={styles.frameEmoji}>
+              <Text style={styles.frameEmojiText}>{frameStyle.emoji}</Text>
+            </View>
+          )}
+        </View>
+
         {photo.uris.length > 1 && (
           <View style={styles.imageIndicator}>
-            <IconSymbol name="photo.stack.fill" size={16} color="#FFFFFF" />
+            <IconSymbol name="photo.fill.on.rectangle.fill" size={16} color="#FFFFFF" />
             <Text style={styles.imageIndicatorText}>
-              {currentImageIndex + 1}/{photo.uris.length}
+              {currentImageIndex + 1} / {photo.uris.length}
             </Text>
-          </View>
-        )}
-        {photo.uris.length > 1 && (
-          <View style={styles.swipeHint}>
-            <Text style={styles.swipeHintText}>Tap to see more</Text>
           </View>
         )}
       </Pressable>
 
-      {/* Content */}
       <View style={styles.content}>
         <View style={styles.header}>
-          <View style={styles.titleContainer}>
-            <IconSymbol name={frame.icon} size={20} color={frame.color} />
+          <View style={styles.headerLeft}>
             <Text style={styles.eventName}>{photo.eventName}</Text>
+            <Text style={styles.date}>{formatDate(photo.date)}</Text>
           </View>
-          {onDelete && (
-            <Pressable onPress={handleDelete} style={styles.deleteButton}>
-              <IconSymbol name="trash.fill" size={20} color={colors.primary} />
-            </Pressable>
-          )}
-        </View>
-
-        <View style={styles.dateContainer}>
-          <IconSymbol name="calendar" size={16} color={colors.textSecondary} />
-          <Text style={styles.date}>{formatDate(photo.date)}</Text>
+          <Pressable onPress={handleDelete} style={styles.deleteButton}>
+            <IconSymbol name="trash.fill" size={20} color={colors.primary} />
+          </Pressable>
         </View>
 
         {photo.description && (
           <View style={styles.descriptionContainer}>
-            <Text
-              style={styles.description}
-              numberOfLines={showFullDescription ? undefined : 3}
-            >
-              {photo.description}
-            </Text>
-            {photo.description.length > 100 && (
-              <Pressable
-                onPress={() => {
-                  setShowFullDescription(!showFullDescription);
-                  if (Platform.OS !== 'web') {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  }
-                }}
-              >
-                <Text style={styles.readMoreText}>
-                  {showFullDescription ? 'Show less' : 'Read more'}
-                </Text>
-              </Pressable>
-            )}
+            <Text style={styles.description}>{photo.description}</Text>
           </View>
         )}
 
-        {photo.songUri && onPlaySong && (
+        {photo.songUri && (
           <View style={styles.songContainer}>
-            <Pressable onPress={onPlaySong} style={styles.songButton}>
-              <View style={styles.playButtonCircle}>
-                <IconSymbol
-                  name={isPlaying ? 'pause.fill' : 'play.fill'}
-                  size={20}
-                  color="#FFFFFF"
-                />
-              </View>
+            <View style={styles.songHeader}>
               <View style={styles.songInfo}>
+                <IconSymbol name="music.note" size={20} color={colors.primary} />
                 <Text style={styles.songName} numberOfLines={1}>
-                  {photo.songName || 'Song'}
+                  {photo.songName || 'Unknown Song'}
                 </Text>
-                {songDuration && (
-                  <Text style={styles.songDuration}>
-                    {currentPosition ? formatTime(currentPosition) : '0:00'} / {formatTime(songDuration)}
-                  </Text>
-                )}
               </View>
-            </Pressable>
-            {isPlaying && songDuration && currentPosition !== undefined && onSeekSong && (
-              <Pressable 
-                onPress={handleProgressBarPress}
-                onLayout={(event) => {
-                  const { width } = event.nativeEvent.layout;
-                  setProgressBarWidth(width);
-                }}
-                style={styles.progressBarContainer}
-              >
-                <View 
-                  style={[
-                    styles.progressBar, 
-                    { width: `${(currentPosition / songDuration) * 100}%` }
-                  ]} 
-                />
-                <View 
-                  style={[
-                    styles.progressThumb,
-                    { left: `${(currentPosition / songDuration) * 100}%` }
-                  ]}
+              <Pressable onPress={onPlaySong} style={styles.playButton}>
+                <IconSymbol
+                  name={isPlaying ? 'pause.circle.fill' : 'play.circle.fill'}
+                  size={32}
+                  color={colors.primary}
                 />
               </Pressable>
+            </View>
+
+            {isPlaying && songDuration && currentPosition !== undefined && (
+              <View style={styles.progressContainer}>
+                <Text style={styles.timeText}>{formatTime(currentPosition)}</Text>
+                <Pressable
+                  onPress={handleProgressBarPress}
+                  style={styles.progressBarContainer}
+                >
+                  <View style={styles.progressBar}>
+                    <View
+                      style={[
+                        styles.progressFill,
+                        { width: `${(currentPosition / songDuration) * 100}%` },
+                      ]}
+                    />
+                  </View>
+                </Pressable>
+                <Text style={styles.timeText}>{formatTime(songDuration)}</Text>
+              </View>
             )}
           </View>
         )}
@@ -223,22 +205,43 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
     borderRadius: 16,
     overflow: 'hidden',
-    boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.1)',
+    marginBottom: 20,
+    boxShadow: '0px 4px 12px rgba(233, 30, 99, 0.15)',
     elevation: 4,
   },
   imageContainer: {
     position: 'relative',
+  },
+  frameContainer: {
+    margin: 12,
+    borderRadius: 12,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  imageWrapper: {
     width: '100%',
     aspectRatio: 4 / 3,
+    overflow: 'hidden',
   },
   image: {
     width: '100%',
     height: '100%',
   },
+  frameEmoji: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 20,
+    padding: 8,
+  },
+  frameEmojiText: {
+    fontSize: 24,
+  },
   imageIndicator: {
     position: 'absolute',
-    top: 12,
-    right: 12,
+    bottom: 20,
+    right: 20,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
     borderRadius: 20,
     paddingHorizontal: 12,
@@ -252,136 +255,92 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-  swipeHint: {
-    position: 'absolute',
-    bottom: 12,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-  },
-  swipeHintText: {
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
   content: {
     padding: 16,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 8,
   },
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  headerLeft: {
     flex: 1,
   },
   eventName: {
     fontSize: 20,
     fontWeight: '700',
     color: colors.text,
-    flex: 1,
-  },
-  deleteButton: {
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: colors.highlight,
-  },
-  dateContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 12,
+    marginBottom: 4,
   },
   date: {
     fontSize: 14,
     color: colors.textSecondary,
-    fontWeight: '500',
+  },
+  deleteButton: {
+    padding: 4,
   },
   descriptionContainer: {
+    backgroundColor: colors.highlight,
+    borderRadius: 8,
+    padding: 12,
     marginBottom: 12,
   },
   description: {
-    fontSize: 15,
-    color: colors.text,
-    lineHeight: 22,
-    marginBottom: 4,
-  },
-  readMoreText: {
     fontSize: 14,
-    color: colors.primary,
-    fontWeight: '600',
+    color: colors.text,
+    lineHeight: 20,
   },
   songContainer: {
-    marginTop: 4,
-  },
-  songButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
     backgroundColor: colors.highlight,
     borderRadius: 12,
     padding: 12,
-    borderWidth: 2,
-    borderColor: colors.primary,
   },
-  playButtonCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
+  songHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
-    boxShadow: '0px 2px 8px rgba(233, 30, 99, 0.3)',
-    elevation: 3,
+    justifyContent: 'space-between',
   },
   songInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     flex: 1,
   },
   songName: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
     color: colors.text,
-    marginBottom: 2,
+    flex: 1,
   },
-  songDuration: {
-    fontSize: 13,
+  playButton: {
+    padding: 4,
+  },
+  progressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
+  },
+  timeText: {
+    fontSize: 12,
     color: colors.textSecondary,
-    fontWeight: '500',
+    fontWeight: '600',
+    minWidth: 40,
   },
   progressBarContainer: {
-    height: 32,
-    backgroundColor: colors.highlight,
-    borderRadius: 16,
-    marginTop: 8,
-    overflow: 'visible',
-    justifyContent: 'center',
-    position: 'relative',
-    borderWidth: 2,
-    borderColor: colors.primary + '40',
+    flex: 1,
+    paddingVertical: 8,
   },
   progressBar: {
+    height: 4,
+    backgroundColor: colors.card,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressFill: {
     height: '100%',
     backgroundColor: colors.primary,
-    borderRadius: 14,
-  },
-  progressThumb: {
-    position: 'absolute',
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: colors.primary,
-    marginLeft: -10,
-    borderWidth: 3,
-    borderColor: '#FFFFFF',
-    boxShadow: '0px 2px 6px rgba(0, 0, 0, 0.3)',
-    elevation: 4,
+    borderRadius: 2,
   },
 });

@@ -1,35 +1,35 @@
 
 {
   "expo": {
-    "name": "Natively",
-    "slug": "Natively",
+    "name": "Romantic",
+    "slug": "Romantic",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/natively-dark.png",
+    "icon": "./assets/images/notebook-icon.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/natively-dark.png",
+      "image": "./assets/images/notebook-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#000000"
+      "backgroundColor": "#E91E63"
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.Natively",
+      "bundleIdentifier": "com.romantic.app",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/natively-dark.png",
-        "backgroundColor": "#000000"
+        "foregroundImage": "./assets/images/notebook-icon.png",
+        "backgroundColor": "#E91E63"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.anonymous.Natively"
+      "package": "com.romantic.app"
     },
     "web": {
-      "favicon": "./assets/images/final_quest_240x240.png",
+      "favicon": "./assets/images/notebook-icon.png",
       "bundler": "metro"
     },
     "plugins": [
@@ -39,14 +39,14 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/natively-dark.png",
+          "icon": "./assets/images/notebook-icon.png",
           "color": "#E91E63",
           "defaultChannel": "memories",
           "sounds": []
         }
       ]
     ],
-    "scheme": "natively",
+    "scheme": "romantic",
     "experiments": {
       "typedRoutes": true
     },

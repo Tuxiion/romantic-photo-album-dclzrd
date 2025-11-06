@@ -9,6 +9,13 @@ export interface Photo {
   createdAt: Date;
   songUri?: string; // New field for song
   songName?: string; // New field for song name
+  imageAdjustments?: ImageAdjustments[]; // Adjustments for each image
+}
+
+export interface ImageAdjustments {
+  scale: number;
+  translateX: number;
+  translateY: number;
 }
 
 export type FrameType = 'hearts' | 'roses' | 'classic' | 'elegant' | 'vintage';
