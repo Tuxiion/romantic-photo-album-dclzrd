@@ -270,7 +270,7 @@ export default function UploadScreen() {
                       onPress={() => openAdjustModal(index)}
                       style={styles.adjustButton}
                     >
-                      <IconSymbol name="viewfinder" size={20} color="#FFFFFF" />
+                      <Text style={styles.adjustButtonEmoji}>↕️</Text>
                     </Pressable>
                     <View style={styles.imageCounter}>
                       <Text style={styles.imageCounterText}>{index + 1}</Text>
@@ -523,6 +523,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(76, 175, 80, 0.9)',
     borderRadius: 12,
     padding: 6,
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  adjustButtonEmoji: {
+    fontSize: 18,
   },
   imageCounter: {
     position: 'absolute',
