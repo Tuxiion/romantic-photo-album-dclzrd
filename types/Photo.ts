@@ -1,7 +1,7 @@
 
 export interface Photo {
   id: string;
-  uri: string;
+  uris: string[]; // Changed from single uri to array of uris
   eventName: string;
   date: Date;
   frame: FrameType;

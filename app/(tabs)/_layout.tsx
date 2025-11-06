@@ -1,3 +1,4 @@
+
 import React from "react";
 import { Platform } from "react-native";
 import { NativeTabs, Icon, Label } from "expo-router/unstable-native-tabs";
@@ -16,7 +17,7 @@ export default function TabLayout() {
     {
       name: "upload",
       route: "/(tabs)/upload",
-      icon: "plus.circle.fill",
+      icon: "photo.badge.plus.fill", // Changed to a more descriptive upload icon
       label: "Upload",
     },
     {
@@ -36,7 +37,7 @@ export default function TabLayout() {
           <Label>Home</Label>
         </NativeTabs.Trigger>
         <NativeTabs.Trigger name="upload">
-          <Icon sf="plus.circle.fill" drawable="ic_upload" />
+          <Icon sf="photo.badge.plus.fill" drawable="ic_upload" />
           <Label>Upload</Label>
         </NativeTabs.Trigger>
         <NativeTabs.Trigger name="profile">

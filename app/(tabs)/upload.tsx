@@ -10,6 +10,7 @@ import {
   Image,
   Platform,
   Alert,
+  FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -24,13 +25,13 @@ import * as Haptics from 'expo-haptics';
 
 export default function UploadScreen() {
   const { addPhoto } = usePhotos();
-  const [imageUri, setImageUri] = useState<string | null>(null);
+  const [imageUris, setImageUris] = useState<string[]>([]);
   const [eventName, setEventName] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedFrame, setSelectedFrame] = useState<FrameType>('hearts');
 
-  const pickImage = async () => {
+  const pickImages = async () => {
     console.log('Requesting image picker permissions...');
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
     
@@ -41,17 +42,27 @@ export default function UploadScreen() {
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [4, 3],
+      allowsEditing: false,
+      allowsMultipleSelection: true,
       quality: 0.8,
+      selectionLimit: 10, // Allow up to 10 images
     });
 
-    if (!result.canceled && result.assets[0]) {
-      console.log('Image selected:', result.assets[0].uri);
-      setImageUri(result.assets[0].uri);
+    if (!result.canceled && result.assets.length > 0) {
+      const newUris = result.assets.map(asset => asset.uri);
+      console.log(`Selected ${newUris.length} images`);
+      setImageUris(prev => [...prev, ...newUris]);
       if (Platform.OS !== 'web') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
+    }
+  };
+
+  const removeImage = (index: number) => {
+    console.log(`Removing image at index ${index}`);
+    setImageUris(prev => prev.filter((_, i) => i !== index));
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
   };
 
@@ -64,8 +75,8 @@ export default function UploadScreen() {
   };
 
   const handleSave = () => {
-    if (!imageUri) {
-      Alert.alert('No Image', 'Please select an image first!');
+    if (imageUris.length === 0) {
+      Alert.alert('No Images', 'Please select at least one image!');
       return;
     }
 
@@ -76,14 +87,14 @@ export default function UploadScreen() {
 
     const newPhoto = {
       id: Date.now().toString(),
-      uri: imageUri,
+      uris: imageUris,
       eventName: eventName.trim(),
       date: selectedDate,
       frame: selectedFrame,
       createdAt: new Date(),
     };
 
-    console.log('Saving photo:', newPhoto.eventName);
+    console.log(`Saving photo with ${imageUris.length} images:`, newPhoto.eventName);
     addPhoto(newPhoto);
     
     if (Platform.OS !== 'web') {
@@ -91,14 +102,14 @@ export default function UploadScreen() {
     }
 
     // Reset form
-    setImageUri(null);
+    setImageUris([]);
     setEventName('');
     setSelectedDate(new Date());
     setSelectedFrame('hearts');
 
     Alert.alert(
       'Success!',
-      'Your romantic memory has been saved! 💕',
+      `Your romantic memory with ${imageUris.length} ${imageUris.length === 1 ? 'photo' : 'photos'} has been saved! 💕\n\nYou'll receive a reminder every year on ${selectedDate.toLocaleDateString()}!`,
       [
         {
           text: 'View Album',
@@ -116,27 +127,64 @@ export default function UploadScreen() {
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <ScrollView
         style={styles.container}
-        contentContainerStyle={[
-          styles.contentContainer,
-          Platform.OS !== 'ios' && styles.contentContainerWithTabBar,
-        ]}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={true}
       >
         <View style={styles.header}>
           <IconSymbol name="heart.fill" size={32} color={colors.primary} />
           <Text style={styles.title}>Add Romantic Memory</Text>
+          <Text style={styles.subtitle}>
+            Select multiple photos to create your memory album
+          </Text>
         </View>
 
         {/* Image Picker */}
-        <Pressable onPress={pickImage} style={styles.imagePickerContainer}>
-          {imageUri ? (
-            <Image source={{ uri: imageUri }} style={styles.previewImage} resizeMode="cover" />
+        <Pressable onPress={pickImages} style={styles.imagePickerContainer}>
+          {imageUris.length > 0 ? (
+            <View style={styles.imageGrid}>
+              <FlatList
+                data={imageUris}
+                horizontal
+                showsHorizontalScrollIndicator={true}
+                keyExtractor={(item, index) => `${item}-${index}`}
+                renderItem={({ item, index }) => (
+                  <View style={styles.imageWrapper}>
+                    <Image source={{ uri: item }} style={styles.thumbnailImage} resizeMode="cover" />
+                    <Pressable
+                      onPress={() => removeImage(index)}
+                      style={styles.removeButton}
+                    >
+                      <IconSymbol name="xmark.circle.fill" size={24} color="#FFFFFF" />
+                    </Pressable>
+                    <View style={styles.imageCounter}>
+                      <Text style={styles.imageCounterText}>{index + 1}</Text>
+                    </View>
+                  </View>
+                )}
+                contentContainerStyle={styles.imageListContent}
+              />
+              <View style={styles.addMoreContainer}>
+                <IconSymbol name="plus.circle.fill" size={32} color={colors.primary} />
+                <Text style={styles.addMoreText}>Tap to add more photos</Text>
+              </View>
+            </View>
           ) : (
             <View style={styles.imagePlaceholder}>
-              <IconSymbol name="photo.fill" size={48} color={colors.textSecondary} />
-              <Text style={styles.placeholderText}>Tap to select a photo</Text>
+              <IconSymbol name="photo.fill.on.rectangle.fill" size={48} color={colors.textSecondary} />
+              <Text style={styles.placeholderText}>Tap to select photos</Text>
+              <Text style={styles.placeholderSubtext}>You can select multiple images</Text>
             </View>
           )}
         </Pressable>
+
+        {imageUris.length > 0 && (
+          <View style={styles.imageCountBadge}>
+            <IconSymbol name="photo.fill" size={16} color="#FFFFFF" />
+            <Text style={styles.imageCountBadgeText}>
+              {imageUris.length} {imageUris.length === 1 ? 'photo' : 'photos'} selected
+            </Text>
+          </View>
+        )}
 
         {/* Event Name Input */}
         <View style={styles.inputContainer}>
@@ -163,6 +211,9 @@ export default function UploadScreen() {
               })}
             </Text>
           </Pressable>
+          <Text style={styles.reminderText}>
+            📅 You'll receive a yearly reminder on this date!
+          </Text>
         </View>
 
         {showDatePicker && (
@@ -183,6 +234,9 @@ export default function UploadScreen() {
           <IconSymbol name="heart.fill" size={20} color="#FFFFFF" />
           <Text style={styles.saveButtonText}>Save Memory</Text>
         </Pressable>
+
+        {/* Extra spacing at bottom for easier scrolling */}
+        <View style={styles.bottomSpacer} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -198,9 +252,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: 20,
-  },
-  contentContainerWithTabBar: {
-    paddingBottom: 100,
+    paddingBottom: 150, // Extra padding at bottom for easier scrolling
   },
   header: {
     alignItems: 'center',
@@ -212,31 +264,106 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginTop: 8,
   },
+  subtitle: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginTop: 4,
+    textAlign: 'center',
+  },
   imagePickerContainer: {
     width: '100%',
-    aspectRatio: 4 / 3,
+    minHeight: 200,
     borderRadius: 16,
     overflow: 'hidden',
-    marginBottom: 24,
+    marginBottom: 16,
     backgroundColor: colors.card,
     boxShadow: '0px 4px 12px rgba(233, 30, 99, 0.15)',
     elevation: 4,
   },
-  previewImage: {
-    width: '100%',
-    height: '100%',
+  imageGrid: {
+    flex: 1,
+  },
+  imageListContent: {
+    padding: 12,
+  },
+  imageWrapper: {
+    marginRight: 12,
+    position: 'relative',
+  },
+  thumbnailImage: {
+    width: 120,
+    height: 160,
+    borderRadius: 12,
+  },
+  removeButton: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 12,
+  },
+  imageCounter: {
+    position: 'absolute',
+    bottom: 4,
+    left: 4,
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  imageCounterText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  addMoreContainer: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderTopWidth: 1,
+    borderTopColor: colors.highlight,
+  },
+  addMoreText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: colors.textSecondary,
+    fontWeight: '500',
   },
   imagePlaceholder: {
     flex: 1,
+    minHeight: 200,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: colors.highlight,
+    padding: 20,
   },
   placeholderText: {
     marginTop: 12,
     fontSize: 16,
+    color: colors.text,
+    fontWeight: '600',
+  },
+  placeholderSubtext: {
+    marginTop: 4,
+    fontSize: 14,
     color: colors.textSecondary,
-    fontWeight: '500',
+  },
+  imageCountBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    alignSelf: 'center',
+    marginBottom: 20,
+    gap: 6,
+  },
+  imageCountBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
   },
   inputContainer: {
     marginBottom: 20,
@@ -271,6 +398,12 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontWeight: '500',
   },
+  reminderText: {
+    marginTop: 8,
+    fontSize: 13,
+    color: colors.primary,
+    fontWeight: '500',
+  },
   saveButton: {
     backgroundColor: colors.primary,
     borderRadius: 12,
@@ -287,5 +420,8 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  bottomSpacer: {
+    height: 50,
   },
 });
