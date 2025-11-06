@@ -31,7 +31,10 @@ export async function playSound(uri: string): Promise<Audio.Sound | null> {
 
     const { sound } = await Audio.Sound.createAsync(
       { uri },
-      { shouldPlay: true }
+      { 
+        shouldPlay: true,
+        progressUpdateIntervalMillis: 50,
+      }
     );
 
     currentSound = sound;
@@ -88,8 +91,15 @@ export async function resumeSound() {
 export async function seekToPosition(seconds: number) {
   try {
     if (currentSound) {
-      console.log('Seeking to position:', seconds);
-      await currentSound.setPositionAsync(seconds * 1000); // Convert to milliseconds
+      const milliseconds = Math.max(0, seconds * 1000);
+      console.log('Seeking to position:', seconds, 'seconds (', milliseconds, 'ms)');
+      await currentSound.setPositionAsync(milliseconds);
+      
+      // Get the status to verify the seek worked
+      const status = await currentSound.getStatusAsync();
+      if (status.isLoaded) {
+        console.log('Seek successful, new position:', status.positionMillis / 1000, 'seconds');
+      }
     }
   } catch (error) {
     console.error('Error seeking sound:', error);

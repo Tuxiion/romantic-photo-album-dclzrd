@@ -505,6 +505,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontSize: 14,
     color: colors.textSecondary,
+    textAlign: 'center',
   },
   imageCountBadge: {
     flexDirection: 'row',

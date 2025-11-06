@@ -63,6 +63,9 @@ export default function FriendsScreen() {
             </Text>
           </View>
         </View>
+
+        {/* Extra spacing for better scrolling */}
+        <View style={styles.extraSpace} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -78,7 +81,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: 20,
-    paddingBottom: 140,
+    paddingBottom: 200,
   },
   header: {
     alignItems: 'center',
@@ -156,5 +159,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textSecondary,
     lineHeight: 22,
+  },
+  extraSpace: {
+    height: 100,
   },
 });

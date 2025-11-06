@@ -30,6 +30,7 @@ export default function PhotoCard({
 }: PhotoCardProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showFullDescription, setShowFullDescription] = useState(false);
+  const [progressBarWidth, setProgressBarWidth] = useState(0);
 
   const frame = frames[photo.frame];
 
@@ -57,16 +58,15 @@ export default function PhotoCard({
   };
 
   const handleProgressBarPress = (event: any) => {
-    if (!songDuration || !onSeekSong) {
-      console.log('Cannot seek: missing duration or seek handler');
+    if (!songDuration || !onSeekSong || !progressBarWidth) {
+      console.log('Cannot seek: missing duration, seek handler, or bar width');
       return;
     }
 
-    const { locationX, currentTarget } = event.nativeEvent;
-    const width = currentTarget?.measure ? 300 : event.nativeEvent.target.offsetWidth || 300;
+    const { locationX } = event.nativeEvent;
     
     // Calculate the position based on where user tapped
-    const percentage = locationX / width;
+    const percentage = Math.max(0, Math.min(1, locationX / progressBarWidth));
     const newPosition = percentage * songDuration;
     
     console.log(`Seeking to ${newPosition.toFixed(2)}s (${(percentage * 100).toFixed(1)}%)`);
@@ -191,6 +191,10 @@ export default function PhotoCard({
             {isPlaying && songDuration && currentPosition !== undefined && onSeekSong && (
               <Pressable 
                 onPress={handleProgressBarPress}
+                onLayout={(event) => {
+                  const { width } = event.nativeEvent.layout;
+                  setProgressBarWidth(width);
+                }}
                 style={styles.progressBarContainer}
               >
                 <View 
@@ -353,9 +357,9 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   progressBarContainer: {
-    height: 24,
+    height: 32,
     backgroundColor: colors.highlight,
-    borderRadius: 12,
+    borderRadius: 16,
     marginTop: 8,
     overflow: 'visible',
     justifyContent: 'center',
@@ -366,18 +370,18 @@ const styles = StyleSheet.create({
   progressBar: {
     height: '100%',
     backgroundColor: colors.primary,
-    borderRadius: 10,
+    borderRadius: 14,
   },
   progressThumb: {
     position: 'absolute',
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     backgroundColor: colors.primary,
-    marginLeft: -8,
-    borderWidth: 2,
+    marginLeft: -10,
+    borderWidth: 3,
     borderColor: '#FFFFFF',
-    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.2)',
-    elevation: 3,
+    boxShadow: '0px 2px 6px rgba(0, 0, 0, 0.3)',
+    elevation: 4,
   },
 });

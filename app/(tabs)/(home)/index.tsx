@@ -7,6 +7,7 @@ import {
   ScrollView,
   Platform,
   Pressable,
+  Alert,
 } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { colors } from '@/styles/commonStyles';
@@ -64,15 +65,43 @@ export default function HomeScreen() {
   };
 
   const handleDeletePhoto = (id: string) => {
-    console.log('Deleting photo:', id);
-    // Stop playing if this photo's song is playing
-    if (playingSongId === id) {
-      stopSound();
-      setPlayingSongId(null);
-      setCurrentPosition(0);
-      setSongDuration(0);
-    }
-    deletePhoto(id);
+    console.log('Delete requested for photo:', id);
+    
+    // Show confirmation dialog
+    Alert.alert(
+      'Delete Memory',
+      'Are you sure you want to delete this memory? This action cannot be undone.',
+      [
+        {
+          text: 'No',
+          style: 'cancel',
+          onPress: () => {
+            console.log('Delete cancelled');
+            if (Platform.OS !== 'web') {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            }
+          },
+        },
+        {
+          text: 'Yes',
+          style: 'destructive',
+          onPress: () => {
+            console.log('Deleting photo:', id);
+            // Stop playing if this photo's song is playing
+            if (playingSongId === id) {
+              stopSound();
+              setPlayingSongId(null);
+              setCurrentPosition(0);
+              setSongDuration(0);
+            }
+            deletePhoto(id);
+            if (Platform.OS !== 'web') {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handlePlaySong = async (id: string, songUri: string) => {
