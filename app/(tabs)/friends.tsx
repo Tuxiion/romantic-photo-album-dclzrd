@@ -56,10 +56,10 @@ export default function FriendsScreen() {
           <View style={styles.infoTextContainer}>
             <Text style={styles.infoTitle}>How it works:</Text>
             <Text style={styles.infoText}>
-              - Log in under Profile to connect your account{'\n'}
-              - Add friends to share your albums{'\n'}
-              - View and celebrate their romantic moments{'\n'}
-              - Keep your memories private or share with loved ones
+              Log in under Profile to connect your account{'\n\n'}
+              Add friends to share your albums{'\n\n'}
+              View and celebrate their romantic moments{'\n\n'}
+              Keep your memories private or share with loved ones
             </Text>
           </View>
         </View>

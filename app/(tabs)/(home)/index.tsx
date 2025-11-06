@@ -14,7 +14,7 @@ import { IconSymbol } from '@/components/IconSymbol';
 import PhotoCard from '@/components/PhotoCard';
 import { usePhotos } from '@/contexts/PhotoContext';
 import * as Haptics from 'expo-haptics';
-import { initializeAudio, playSound, pauseSound, stopSound, getSoundStatus } from '@/utils/audioPlayer';
+import { initializeAudio, playSound, pauseSound, stopSound, getSoundStatus, seekToPosition } from '@/utils/audioPlayer';
 
 export default function HomeScreen() {
   const { photos, deletePhoto } = usePhotos();
@@ -95,6 +95,16 @@ export default function HomeScreen() {
     }
   };
 
+  const handleSeekSong = async (position: number) => {
+    console.log('Seeking to position:', position);
+    await seekToPosition(position);
+    setCurrentPosition(position);
+    
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  };
+
   const renderHeaderRight = () => (
     <Pressable onPress={handleAddPhoto} style={styles.headerButtonContainer}>
       <IconSymbol name="plus" color={colors.primary} />
@@ -152,6 +162,7 @@ export default function HomeScreen() {
                   photo={photo}
                   onDelete={() => handleDeletePhoto(photo.id)}
                   onPlaySong={photo.songUri ? () => handlePlaySong(photo.id, photo.songUri!) : undefined}
+                  onSeekSong={playingSongId === photo.id ? handleSeekSong : undefined}
                   isPlaying={playingSongId === photo.id}
                   songDuration={playingSongId === photo.id ? songDuration : undefined}
                   currentPosition={playingSongId === photo.id ? currentPosition : undefined}

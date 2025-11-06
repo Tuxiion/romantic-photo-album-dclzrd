@@ -94,11 +94,6 @@ const TabItem = ({ tab, isActive, onPress }: TabItemProps) => {
         >
           {isUploadTab ? (
             <View style={styles.uploadIconWrapper}>
-              <IconSymbol
-                name={tab.icon as any}
-                size={24}
-                color={isActive ? colors.primary : colors.textSecondary}
-              />
               <Text style={styles.uploadEmoji}>💌</Text>
             </View>
           ) : (
@@ -170,13 +165,10 @@ const styles = StyleSheet.create({
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    position: 'relative',
   },
   uploadEmoji: {
-    position: 'absolute',
-    fontSize: 14,
-    top: 2,
-    right: 2,
+    fontSize: 28,
+    textAlign: 'center',
   },
   label: {
     fontSize: 11,

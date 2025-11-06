@@ -12,6 +12,7 @@ interface PhotoCardProps {
   onPress?: () => void;
   onDelete?: () => void;
   onPlaySong?: () => void;
+  onSeekSong?: (position: number) => void;
   isPlaying?: boolean;
   songDuration?: number;
   currentPosition?: number;
@@ -22,6 +23,7 @@ export default function PhotoCard({
   onPress, 
   onDelete, 
   onPlaySong, 
+  onSeekSong,
   isPlaying,
   songDuration,
   currentPosition 
@@ -52,6 +54,28 @@ export default function PhotoCard({
     if (onPress) {
       onPress();
     }
+  };
+
+  const handleProgressBarPress = (event: any) => {
+    if (!songDuration || !onSeekSong) {
+      console.log('Cannot seek: missing duration or seek handler');
+      return;
+    }
+
+    const { locationX, currentTarget } = event.nativeEvent;
+    const width = currentTarget?.measure ? 300 : event.nativeEvent.target.offsetWidth || 300;
+    
+    // Calculate the position based on where user tapped
+    const percentage = locationX / width;
+    const newPosition = percentage * songDuration;
+    
+    console.log(`Seeking to ${newPosition.toFixed(2)}s (${(percentage * 100).toFixed(1)}%)`);
+    
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    
+    onSeekSong(newPosition);
   };
 
   const formatDate = (date: Date) => {
@@ -164,15 +188,24 @@ export default function PhotoCard({
                 )}
               </View>
             </Pressable>
-            {isPlaying && songDuration && currentPosition !== undefined && (
-              <View style={styles.progressBarContainer}>
+            {isPlaying && songDuration && currentPosition !== undefined && onSeekSong && (
+              <Pressable 
+                onPress={handleProgressBarPress}
+                style={styles.progressBarContainer}
+              >
                 <View 
                   style={[
                     styles.progressBar, 
                     { width: `${(currentPosition / songDuration) * 100}%` }
                   ]} 
                 />
-              </View>
+                <View 
+                  style={[
+                    styles.progressThumb,
+                    { left: `${(currentPosition / songDuration) * 100}%` }
+                  ]}
+                />
+              </Pressable>
             )}
           </View>
         )}
@@ -320,15 +353,31 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   progressBarContainer: {
-    height: 4,
+    height: 24,
     backgroundColor: colors.highlight,
-    borderRadius: 2,
+    borderRadius: 12,
     marginTop: 8,
-    overflow: 'hidden',
+    overflow: 'visible',
+    justifyContent: 'center',
+    position: 'relative',
+    borderWidth: 2,
+    borderColor: colors.primary + '40',
   },
   progressBar: {
     height: '100%',
     backgroundColor: colors.primary,
-    borderRadius: 2,
+    borderRadius: 10,
+  },
+  progressThumb: {
+    position: 'absolute',
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: colors.primary,
+    marginLeft: -8,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.2)',
+    elevation: 3,
   },
 });
