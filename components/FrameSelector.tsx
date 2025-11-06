@@ -14,7 +14,6 @@ interface FrameSelectorProps {
 export default function FrameSelector({ selectedFrame, onSelectFrame }: FrameSelectorProps) {
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>Select Frame Style</Text>
       <ScrollView 
         horizontal 
         showsHorizontalScrollIndicator={false}
@@ -50,13 +49,7 @@ export default function FrameSelector({ selectedFrame, onSelectFrame }: FrameSel
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: 12,
+    marginBottom: 0,
   },
   scrollContent: {
     gap: 12,

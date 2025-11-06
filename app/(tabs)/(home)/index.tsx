@@ -58,7 +58,7 @@ export default function HomeScreen() {
           {/* Header */}
           <View style={styles.header}>
             <IconSymbol name="heart.fill" size={40} color={colors.primary} />
-            <Text style={styles.title}>Our Love Story</Text>
+            <Text style={styles.title}>My story</Text>
             <Text style={styles.subtitle}>
               {photos.length} {photos.length === 1 ? 'Memory' : 'Memories'} Captured
             </Text>

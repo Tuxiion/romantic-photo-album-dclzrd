@@ -74,8 +74,6 @@ export default function FloatingTabBar({
 }
 
 const TabItem = ({ tab, isActive, onPress }: TabItemProps) => {
-  const scale = useSharedValue(isActive ? 1.2 : 1);
-  
   const animatedStyle = useAnimatedStyle(() => {
     return {
       transform: [{ scale: withTiming(isActive ? 1.2 : 1, { duration: 200 }) }],

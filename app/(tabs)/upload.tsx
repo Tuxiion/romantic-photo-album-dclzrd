@@ -156,7 +156,7 @@ export default function UploadScreen() {
       >
         <View style={styles.header}>
           <IconSymbol name="heart.fill" size={32} color={colors.primary} />
-          <Text style={styles.title}>Add Romantic Memory</Text>
+          <Text style={styles.title}>Add a Memory</Text>
           <Text style={styles.subtitle}>
             Select multiple photos to create your memory album
           </Text>
@@ -256,9 +256,8 @@ export default function UploadScreen() {
           />
         )}
 
-        {/* Frame Selector */}
+        {/* Frame Selector - Label removed from here */}
         <View style={styles.frameSelectorContainer}>
-          <Text style={styles.label}>Choose Frame Style</Text>
           <FrameSelector selectedFrame={selectedFrame} onSelectFrame={setSelectedFrame} />
         </View>
 

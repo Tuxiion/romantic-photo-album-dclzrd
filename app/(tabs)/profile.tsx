@@ -14,7 +14,6 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { usePhotos } from '@/contexts/PhotoContext';
 import { colors } from '@/styles/commonStyles';
 import {
-  getAllScheduledNotifications,
   requestNotificationPermissions,
 } from '@/utils/notifications';
 import * as Haptics from 'expo-haptics';
@@ -24,48 +23,98 @@ import * as WebBrowser from 'expo-web-browser';
 // Required for web-based authentication
 WebBrowser.maybeCompleteAuthSession();
 
-// Google OAuth configuration - Updated with your Client ID
+// Google OAuth configuration - Your Client ID
 const GOOGLE_CLIENT_ID = '1012013851449-lpuk4528h5nfk5fojdpmumdp3ogb79h6.apps.googleusercontent.com';
-
-const discovery = {
-  authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
-  tokenEndpoint: 'https://oauth2.googleapis.com/token',
-  revocationEndpoint: 'https://oauth2.googleapis.com/revoke',
-};
 
 export default function ProfileScreen() {
   const { photos } = usePhotos();
-  const [notificationCount, setNotificationCount] = useState(0);
   const [user, setUser] = useState<{ name?: string; email?: string } | null>(null);
+  const [friendsCount, setFriendsCount] = useState(0);
 
-  // Google OAuth setup
+  // Google OAuth setup with proper configuration
   const [request, response, promptAsync] = AuthSession.useAuthRequest(
     {
       clientId: GOOGLE_CLIENT_ID,
       scopes: ['openid', 'profile', 'email'],
       redirectUri: AuthSession.makeRedirectUri({
         scheme: 'natively',
+        path: 'redirect',
       }),
     },
-    discovery
+    {
+      authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
+      tokenEndpoint: 'https://oauth2.googleapis.com/token',
+      revocationEndpoint: 'https://oauth2.googleapis.com/revoke',
+    }
   );
-
-  useEffect(() => {
-    checkNotifications();
-  }, [photos]);
 
   useEffect(() => {
     if (response?.type === 'success') {
       const { authentication } = response;
-      console.log('Google authentication successful:', authentication);
+      console.log('Google authentication successful');
       fetchUserInfo(authentication?.accessToken);
+    } else if (response?.type === 'error') {
+      console.error('Google authentication error:', response.error);
+      Alert.alert('Authentication Error', 'Failed to sign in with Google. Please try again.');
     }
   }, [response]);
 
-  const checkNotifications = async () => {
-    const scheduled = await getAllScheduledNotifications();
-    console.log(`Found ${scheduled.length} scheduled notifications`);
-    setNotificationCount(scheduled.length);
+  const fetchUserInfo = async (accessToken?: string) => {
+    if (!accessToken) {
+      console.log('No access token available');
+      return;
+    }
+
+    try {
+      const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch user info');
+      }
+      
+      const userInfo = await response.json();
+      console.log('User info fetched:', userInfo.email);
+      setUser({
+        name: userInfo.name,
+        email: userInfo.email,
+      });
+      
+      if (Platform.OS !== 'web') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+      
+      Alert.alert('Welcome!', `Signed in as ${userInfo.name}`);
+    } catch (error) {
+      console.error('Error fetching user info:', error);
+      Alert.alert('Error', 'Failed to fetch user information');
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    console.log('Initiating Google Sign-In...');
+    
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+
+    try {
+      const result = await promptAsync();
+      console.log('Auth prompt result:', result.type);
+    } catch (error) {
+      console.error('Error during Google Sign-In:', error);
+      Alert.alert('Error', 'Failed to sign in with Google');
+    }
+  };
+
+  const handleSignOut = () => {
+    console.log('Signing out...');
+    setUser(null);
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    Alert.alert('Signed Out', 'You have been signed out successfully');
   };
 
   const handleEnableNotifications = async () => {
@@ -84,57 +133,6 @@ export default function ProfileScreen() {
         'Please enable notifications in your device settings to receive memory reminders.'
       );
     }
-  };
-
-  const fetchUserInfo = async (accessToken?: string) => {
-    if (!accessToken) {
-      console.log('No access token available');
-      return;
-    }
-
-    try {
-      const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      const userInfo = await response.json();
-      console.log('User info fetched:', userInfo);
-      setUser({
-        name: userInfo.name,
-        email: userInfo.email,
-      });
-      if (Platform.OS !== 'web') {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      }
-      Alert.alert('Welcome!', `Signed in as ${userInfo.name}`);
-    } catch (error) {
-      console.error('Error fetching user info:', error);
-      Alert.alert('Error', 'Failed to fetch user information');
-    }
-  };
-
-  const handleGoogleSignIn = async () => {
-    console.log('Initiating Google Sign-In...');
-    
-    if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    }
-
-    try {
-      const result = await promptAsync();
-      console.log('Auth result:', result);
-    } catch (error) {
-      console.error('Error during Google Sign-In:', error);
-      Alert.alert('Error', 'Failed to sign in with Google');
-    }
-  };
-
-  const handleSignOut = () => {
-    console.log('Signing out...');
-    setUser(null);
-    if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
-    Alert.alert('Signed Out', 'You have been signed out successfully');
   };
 
   const totalPhotos = photos.reduce((sum, photo) => sum + photo.uris.length, 0);
@@ -172,7 +170,11 @@ export default function ProfileScreen() {
               <Text style={styles.signOutButtonText}>Sign Out</Text>
             </Pressable>
           ) : (
-            <Pressable onPress={handleGoogleSignIn} style={styles.googleButton}>
+            <Pressable 
+              onPress={handleGoogleSignIn} 
+              style={styles.googleButton}
+              disabled={!request}
+            >
               <IconSymbol name="g.circle.fill" size={20} color="#FFFFFF" />
               <Text style={styles.googleButtonText}>Sign in with Google</Text>
             </Pressable>
@@ -196,11 +198,39 @@ export default function ProfileScreen() {
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <IconSymbol name="bell.fill" size={32} color={colors.accent} />
-              <Text style={styles.statNumber}>{notificationCount}</Text>
-              <Text style={styles.statLabel}>Reminders</Text>
+              <IconSymbol name="person.2.fill" size={32} color={colors.accent} />
+              <Text style={styles.statNumber}>{friendsCount}</Text>
+              <Text style={styles.statLabel}>Friends</Text>
             </View>
           </View>
+        </View>
+
+        {/* Friends Card */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <IconSymbol name="person.2.fill" size={24} color={colors.primary} />
+            <Text style={styles.cardTitle}>Friends</Text>
+          </View>
+          <Text style={styles.cardDescription}>
+            Connect with friends to share your romantic memories and view their albums.
+          </Text>
+          <View style={styles.friendsInfo}>
+            <Text style={styles.friendsCountText}>
+              You have {friendsCount} {friendsCount === 1 ? 'friend' : 'friends'}
+            </Text>
+          </View>
+          <Pressable 
+            onPress={() => {
+              if (Platform.OS !== 'web') {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              }
+              Alert.alert('Coming Soon', 'Friend management features are coming soon!');
+            }} 
+            style={styles.actionButton}
+          >
+            <IconSymbol name="person.badge.plus.fill" size={20} color="#FFFFFF" />
+            <Text style={styles.actionButtonText}>Add Friends</Text>
+          </Pressable>
         </View>
 
         {/* Notifications Card */}
@@ -213,9 +243,9 @@ export default function ProfileScreen() {
             Enable notifications to receive yearly reminders for your romantic memories on their
             anniversary dates.
           </Text>
-          <Pressable onPress={handleEnableNotifications} style={styles.enableButton}>
+          <Pressable onPress={handleEnableNotifications} style={styles.actionButton}>
             <IconSymbol name="bell.fill" size={20} color="#FFFFFF" />
-            <Text style={styles.enableButtonText}>Enable Notifications</Text>
+            <Text style={styles.actionButtonText}>Enable Notifications</Text>
           </Pressable>
         </View>
 
@@ -356,7 +386,19 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 4,
   },
-  enableButton: {
+  friendsInfo: {
+    backgroundColor: colors.highlight,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  friendsCountText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  actionButton: {
     backgroundColor: colors.primary,
     borderRadius: 12,
     padding: 16,
@@ -365,7 +407,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
   },
-  enableButtonText: {
+  actionButtonText: {
     fontSize: 16,
     fontWeight: '700',
     color: '#FFFFFF',
