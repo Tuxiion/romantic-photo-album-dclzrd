@@ -84,26 +84,3 @@ export async function resumeSound() {
     console.error('Error resuming sound:', error);
   }
 }
-
-export async function seekToPosition(seconds: number) {
-  try {
-    if (currentSound) {
-      console.log('Seeking to position:', seconds);
-      await currentSound.setPositionAsync(seconds * 1000); // Convert to milliseconds
-    }
-  } catch (error) {
-    console.error('Error seeking sound:', error);
-  }
-}
-
-export async function getSoundStatus() {
-  try {
-    if (currentSound) {
-      return await currentSound.getStatusAsync();
-    }
-    return null;
-  } catch (error) {
-    console.error('Error getting sound status:', error);
-    return null;
-  }
-}
