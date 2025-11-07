@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -7,41 +6,37 @@ import {
   Image,
   Pressable,
   Platform,
-  ScrollView,
-} from 'react-native';
-import { Photo } from '@/types/Photo';
-import { IconSymbol } from './IconSymbol';
-import { colors } from '@/styles/commonStyles';
-import { frames } from '@/data/frames';
-import * as Haptics from 'expo-haptics';
-import Animated, { useAnimatedStyle } from 'react-native-reanimated';
+} from "react-native";
+import { Photo } from "@/types/Photo";
+import { IconSymbol } from "./IconSymbol";
+import { colors } from "@/styles/commonStyles";
+import { frames } from "@/data/frames";
+import * as Haptics from "expo-haptics";
+import {
+  playSound,
+  pauseSound,
+  resumeSound,
+  stopSound,
+  getSoundStatus,
+  seekToPosition,
+} from "@/utils/audioPlayer";
 
 interface PhotoCardProps {
   photo: Photo;
   onPress?: () => void;
   onDelete?: () => void;
-  onPlaySong?: () => void;
-  onSeekSong?: (position: number) => void;
-  isPlaying?: boolean;
-  songDuration?: number;
-  currentPosition?: number;
 }
 
-export default function PhotoCard({
-  photo,
-  onPress,
-  onDelete,
-  onPlaySong,
-  onSeekSong,
-  isPlaying,
-  songDuration,
-  currentPosition,
-}: PhotoCardProps) {
+export default function PhotoCard({ photo, onPress, onDelete }: PhotoCardProps) {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [songDuration, setSongDuration] = useState<number | null>(null);
+  const [currentPosition, setCurrentPosition] = useState(0);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const progressInterval = useRef<NodeJS.Timeout | null>(null);
   const frameStyle = frames[photo.frame];
 
   const handleDelete = () => {
-    if (Platform.OS !== 'web') {
+    if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
     onDelete?.();
@@ -51,47 +46,79 @@ export default function PhotoCard({
     if (photo.uris.length > 1) {
       const nextIndex = (currentImageIndex + 1) % photo.uris.length;
       setCurrentImageIndex(nextIndex);
-      if (Platform.OS !== 'web') {
+      if (Platform.OS !== "web") {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
     }
   };
 
-  const handleProgressBarPress = (event: any) => {
-    if (!songDuration || !onSeekSong) {
-      console.log('Cannot seek: missing duration or callback');
+  const handlePlayPress = async () => {
+    if (!photo.songUri) {
+      console.log("No song URI found");
       return;
     }
 
+    try {
+      if (isPlaying) {
+        await pauseSound();
+        setIsPlaying(false);
+        if (progressInterval.current) clearInterval(progressInterval.current);
+      } else {
+        await playSound(photo.songUri);
+        setIsPlaying(true);
+        startProgressUpdates();
+      }
+    } catch (error) {
+      console.error("Error toggling sound:", error);
+    }
+  };
+
+  const startProgressUpdates = () => {
+    progressInterval.current = setInterval(async () => {
+      const status = await getSoundStatus();
+      if (status?.isLoaded) {
+        setSongDuration(status.durationMillis / 1000);
+        setCurrentPosition(status.positionMillis / 1000);
+        if (status.didJustFinish) {
+          clearInterval(progressInterval.current!);
+          setIsPlaying(false);
+          setCurrentPosition(0);
+        }
+      }
+    }, 500);
+  };
+
+  const handleProgressBarPress = async (event: any) => {
+    if (!songDuration) return;
     const { locationX } = event.nativeEvent;
     const progressBarWidth = event.currentTarget.offsetWidth || 300;
-    const percentage = locationX / progressBarWidth;
+    const percentage = Math.min(Math.max(locationX / progressBarWidth, 0), 1);
     const newPosition = percentage * songDuration;
-
-    console.log(`Seeking to ${newPosition.toFixed(2)}s (${(percentage * 100).toFixed(1)}%)`);
-    onSeekSong(newPosition);
-
-    if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
+    await seekToPosition(newPosition);
+    setCurrentPosition(newPosition);
   };
 
   const formatDate = (date: Date) => {
     const d = new Date(date);
-    return d.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
+    return d.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
     });
   };
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const currentAdjustment = photo.imageAdjustments?.[currentImageIndex];
+  useEffect(() => {
+    return () => {
+      if (progressInterval.current) clearInterval(progressInterval.current);
+      stopSound();
+    };
+  }, []);
 
   return (
     <View style={styles.card}>
@@ -106,42 +133,22 @@ export default function PhotoCard({
             },
           ]}
         >
-          <View style={styles.imageWrapper}>
-            <Image
-              source={{ uri: photo.uris[currentImageIndex] }}
-              style={[
-                styles.image,
-                currentAdjustment && {
-                  transform: [
-                    { scale: currentAdjustment.scale },
-                    { translateX: currentAdjustment.translateX },
-                    { translateY: currentAdjustment.translateY },
-                  ],
-                },
-              ]}
-              resizeMode="cover"
-            />
-          </View>
+          <Image
+            source={{ uri: photo.uris[currentImageIndex] }}
+            style={styles.image}
+            resizeMode="cover"
+          />
           {frameStyle.emoji && (
             <View style={styles.frameEmoji}>
               <Text style={styles.frameEmojiText}>{frameStyle.emoji}</Text>
             </View>
           )}
         </View>
-
-        {photo.uris.length > 1 && (
-          <View style={styles.imageIndicator}>
-            <IconSymbol name="photo.fill.on.rectangle.fill" size={16} color="#FFFFFF" />
-            <Text style={styles.imageIndicatorText}>
-              {currentImageIndex + 1} / {photo.uris.length}
-            </Text>
-          </View>
-        )}
       </Pressable>
 
       <View style={styles.content}>
         <View style={styles.header}>
-          <View style={styles.headerLeft}>
+          <View>
             <Text style={styles.eventName}>{photo.eventName}</Text>
             <Text style={styles.date}>{formatDate(photo.date)}</Text>
           </View>
@@ -162,21 +169,23 @@ export default function PhotoCard({
               <View style={styles.songInfo}>
                 <IconSymbol name="music.note" size={20} color={colors.primary} />
                 <Text style={styles.songName} numberOfLines={1}>
-                  {photo.songName || 'Unknown Song'}
+                  {photo.songName || "Unknown Song"}
                 </Text>
               </View>
-              <Pressable onPress={onPlaySong} style={styles.playButton}>
+              <Pressable onPress={handlePlayPress} style={styles.playButton}>
                 <IconSymbol
-                  name={isPlaying ? 'pause.circle.fill' : 'play.circle.fill'}
+                  name={isPlaying ? "pause.circle.fill" : "play.circle.fill"}
                   size={32}
                   color={colors.primary}
                 />
               </Pressable>
             </View>
 
-            {isPlaying && songDuration && currentPosition !== undefined && (
+            {songDuration && (
               <View style={styles.progressContainer}>
-                <Text style={styles.timeText}>{formatTime(currentPosition)}</Text>
+                <Text style={styles.timeText}>
+                  {formatTime(currentPosition)}
+                </Text>
                 <Pressable
                   onPress={handleProgressBarPress}
                   style={styles.progressBarContainer}
@@ -185,7 +194,9 @@ export default function PhotoCard({
                     <View
                       style={[
                         styles.progressFill,
-                        { width: `${(currentPosition / songDuration) * 100}%` },
+                        {
+                          width: `${(currentPosition / songDuration) * 100}%`,
+                        },
                       ]}
                     />
                   </View>
@@ -204,142 +215,84 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.card,
     borderRadius: 16,
-    overflow: 'hidden',
+    overflow: "hidden",
     marginBottom: 20,
-    boxShadow: '0px 4px 12px rgba(233, 30, 99, 0.15)',
     elevation: 4,
   },
-  imageContainer: {
-    position: 'relative',
-  },
+  imageContainer: { position: "relative" },
   frameContainer: {
     margin: 12,
     borderRadius: 12,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  imageWrapper: {
-    width: '100%',
-    aspectRatio: 4 / 3,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   image: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    aspectRatio: 4 / 3,
   },
   frameEmoji: {
-    position: 'absolute',
+    position: "absolute",
     top: 8,
     right: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: "rgba(255,255,255,0.9)",
     borderRadius: 20,
     padding: 8,
   },
-  frameEmojiText: {
-    fontSize: 24,
-  },
-  imageIndicator: {
-    position: 'absolute',
-    bottom: 20,
-    right: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  imageIndicatorText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  content: {
-    padding: 16,
-  },
+  frameEmojiText: { fontSize: 24 },
+  content: { padding: 16 },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  headerLeft: {
-    flex: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
   },
   eventName: {
     fontSize: 20,
-    fontWeight: '700',
+    fontWeight: "700",
     color: colors.text,
-    marginBottom: 4,
   },
-  date: {
-    fontSize: 14,
-    color: colors.textSecondary,
-  },
-  deleteButton: {
-    padding: 4,
-  },
+  date: { fontSize: 14, color: colors.textSecondary },
+  deleteButton: { padding: 4 },
   descriptionContainer: {
     backgroundColor: colors.highlight,
     borderRadius: 8,
     padding: 12,
-    marginBottom: 12,
+    marginTop: 8,
   },
-  description: {
-    fontSize: 14,
-    color: colors.text,
-    lineHeight: 20,
-  },
+  description: { fontSize: 14, color: colors.text },
   songContainer: {
     backgroundColor: colors.highlight,
     borderRadius: 12,
     padding: 12,
+    marginTop: 12,
   },
   songHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
-  songInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flex: 1,
-  },
-  songName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text,
-    flex: 1,
-  },
-  playButton: {
-    padding: 4,
-  },
+  songInfo: { flexDirection: "row", alignItems: "center", gap: 8, flex: 1 },
+  songName: { fontSize: 14, fontWeight: "600", color: colors.text },
+  playButton: { padding: 4 },
   progressContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
     marginTop: 8,
   },
   timeText: {
     fontSize: 12,
     color: colors.textSecondary,
-    fontWeight: '600',
+    fontWeight: "600",
     minWidth: 40,
   },
-  progressBarContainer: {
-    flex: 1,
-    paddingVertical: 8,
-  },
+  progressBarContainer: { flex: 1, paddingVertical: 8 },
   progressBar: {
     height: 4,
     backgroundColor: colors.card,
     borderRadius: 2,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   progressFill: {
-    height: '100%',
+    height: "100%",
     backgroundColor: colors.primary,
     borderRadius: 2,
   },
