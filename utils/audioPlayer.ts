@@ -1,9 +1,6 @@
-import { playSound, pauseSound, stopSound, resumeSound } from '@/utils/audioPlayer';
-await playSound('https://example.com/song.mp3');
-await pauseSound();
-await resumeSound();
 
 import { Audio } from 'expo-av';
+import { Platform } from 'react-native';
 
 let currentSound: Audio.Sound | null = null;
 
@@ -25,6 +22,7 @@ export async function playSound(uri: string): Promise<Audio.Sound | null> {
   try {
     console.log('Loading sound from:', uri);
     
+    // Stop and unload current sound if exists
     if (currentSound) {
       await currentSound.stopAsync();
       await currentSound.unloadAsync();
@@ -33,7 +31,7 @@ export async function playSound(uri: string): Promise<Audio.Sound | null> {
 
     const { sound } = await Audio.Sound.createAsync(
       { uri },
-      { shouldPlay: true, progressUpdateIntervalMillis: 50 }
+      { shouldPlay: true }
     );
 
     currentSound = sound;
@@ -84,5 +82,17 @@ export async function resumeSound() {
     }
   } catch (error) {
     console.error('Error resuming sound:', error);
+  }
+}
+
+export async function getSoundStatus() {
+  try {
+    if (currentSound) {
+      return await currentSound.getStatusAsync();
+    }
+    return null;
+  } catch (error) {
+    console.error('Error getting sound status:', error);
+    return null;
   }
 }
